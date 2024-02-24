@@ -1,0 +1,53 @@
+---
+title: "STAT 429 Housing Market"
+author: "Kunal Bhardwaj"
+date: "2024-02-23"
+output: html_document
+---
+
+```{r}
+library(readr)
+MSPUS <- read_csv("Data/MSPUS.csv",
+                  col_types = cols(DATE = col_date(format = "%Y-%m-%d")))
+
+MSACSR <- read_csv("Data/MSACSR.csv",
+                   col_types = cols(DATE = col_date(format = "%Y-%m-%d")))
+
+HOUST <- read_csv("Data/HOUST.csv",
+                  col_types = cols(DATE = col_date(format = "%Y-%m-%d")))
+
+MORTGAGE30US <- read_csv("Data/MORTGAGE30US.csv",
+                         col_types = cols(DATE = col_date(format = "%Y-%m-%d")))
+```
+
+
+```{r}
+library(astsa)
+library(ggplot2)
+library(ggfortify)
+library(fpp2)
+library(imputeTS) # For handling missing values by imputation
+
+mspus.ts <- ts(MSPUS$MSPUS, start = 1963, frequency = 4) # Select 2nd column from MSPUS
+tsplot(mspus.ts, col ="darkorange",
+       main = "Median Sales Price of Houses Sold for the United States",
+       ylab = "USD")
+
+msacsr.ts <- ts(MSACSR$MSACSR, start = 1963, frequency = 12) # Select 2nd column from MSACSR
+tsplot(msacsr.ts, col ="mediumblue",
+       main = "Monthly Supply of New Houses in the United States",
+       ylab = "Month's Supply")
+
+houst.ts <- ts(HOUST$HOUST, start = 1959, frequency = 12) # Select 2nd column from HOUST
+tsplot(houst.ts, col ="limegreen",
+       main = "New Privately-Owned Housing Units Started : Total Units",
+       ylab = "Thousands of Units")
+
+
+# MORTGAGE30US contains missing values. They will be imputed by averaging
+
+mortgage.ts <- ts(MORTGAGE30US, start = c(1971, 4) , frequency = 52) # Select 2nd column from MORTGAGE30US
+tsplot(mortgage.ts, col ="grey",
+       main = "30-Year Fixed Rate Mortgage Average in the United States", ylab = "Percent")
+```
+
