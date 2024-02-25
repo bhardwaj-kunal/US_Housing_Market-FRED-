@@ -1,11 +1,13 @@
 ---
-title: "STAT 429 Project: US Housing Market"
+title: 'STAT 429 Project: US Housing Market'
 author: "Kunal Bhardwaj"
 date: "2024-02-23"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
-```{r message=FALSE}
+```{r message=FALSE, warning=FALSE}
 library(readr)
 MSPUS <- read_csv("Data/MSPUS.csv",
                   col_types = cols(DATE = col_date(format = "%Y-%m-%d")))
@@ -14,10 +16,15 @@ MSACSR <- read_csv("Data/MSACSR.csv",
                    col_types = cols(DATE = col_date(format = "%Y-%m-%d")))
 
 HOUST <- read_csv("Data/HOUST.csv",
-                  col_types = cols(DATE = col_date(format = "%Y-%m-%d")))
+                  col_types = cols(DATE = col_date(format = "%Y-%m-%d"),
+                                   HOUST = col_number()))
+
+RHORUSQ156N <- read_csv("Data/RHORUSQ156N.csv", 
+    col_types = cols(DATE = col_date(format = "%Y-%m-%d")))
 
 MORTGAGE30US <- read_csv("Data/MORTGAGE30US.csv",
-                         col_types = cols(DATE = col_date(format = "%Y-%m-%d")))
+                         col_types = cols(DATE = col_date(format = "%Y-%m-%d"),
+                                          MORTGAGE30US = col_number()))
 ```
 
 
@@ -30,19 +37,21 @@ library(imputeTS) # For handling missing values by imputation
 library(tseries) # To carry out ADF & KPSS Tests
 library(lmtest) # To carry out BP-Test
 
-mspus.ts <- ts(MSPUS$MSPUS, start = 1963, frequency = 4) # Select 2nd column from MSPUS
-msacsr.ts <- ts(MSACSR$MSACSR, start = 1963, frequency = 12) # Select 2nd column from MSACSR
-houst.ts <- ts(HOUST$HOUST, start = 1959, frequency = 12) # Select 2nd column from HOUST
+mspus.ts <- ts(MSPUS$MSPUS[34:244], start = c(1971, 2), frequency = 4, end = c(2023, 4))
+msacsr.ts <- ts(MSACSR$MSACSR[34:244], start = c(1971, 2), frequency = 4, end = c(2023, 4))
+houst.ts <- ts(HOUST$HOUST[50:261], start = c(1971, 2), frequency = 4, end = c(2023, 4))
+rhorusq156n.ts <- ts(RHORUSQ156N$RHORUSQ156N[26:236], start = c(1971, 2), frequency = 4, end = c(2023, 4))
+
 
 # MORTGAGE30US contains missing values. They are occupied by "."
 # They will be imputed by replacing with NA follwed by linear interpolation
-MORTGAGE30US$MORTGAGE30US <- ifelse(MORTGAGE30US$MORTGAGE30US == ".",
-                                    NA, MORTGAGE30US$MORTGAGE30US)
-MORTGAGE30US$MORTGAGE30US <- na_interpolation(as.numeric(MORTGAGE30US$MORTGAGE30US))
+#MORTGAGE30US$MORTGAGE30US <- ifelse(MORTGAGE30US$MORTGAGE30US == ".",
+#                                    NA, MORTGAGE30US$MORTGAGE30US)
+#MORTGAGE30US$MORTGAGE30US <- na_interpolation(as.numeric(MORTGAGE30US$MORTGAGE30US))
 # Select 2nd column from MORTGAGE30US. The first value on Apr 2 1971 falls on the 14th week
-mortgage.ts <- ts(MORTGAGE30US$MORTGAGE30US, start = c(1971, 14) , frequency = 52)
+mortgage.ts <- ts(MORTGAGE30US$MORTGAGE30US, start = c(1971, 2) , frequency = 4, end = c(2023, 4))
 
-par(mfrow=c(4,1))
+par(mfrow=c(5,1))
 tsplot(mspus.ts, col ="darkorange",
        main = "Median Sales Price of Houses Sold for the United States",
        ylab = "USD")
@@ -52,8 +61,14 @@ tsplot(msacsr.ts, col ="mediumblue",
 tsplot(houst.ts, col ="limegreen",
        main = "New Privately-Owned Housing Units Started : Total Units",
        ylab = "Thousands of Units")
+tsplot(rhorusq156n.ts, col ="red",
+       main = "Homeownership Rate in the United States",
+       ylab = "Percent")
 tsplot(mortgage.ts, col ="grey",
        main = "30-Year Fixed Rate Mortgage Average in the United States", ylab = "Percent")
+```
+```{r}
+
 ```
 
 
@@ -98,10 +113,11 @@ The BP Test for homoscedasticity fails for MSPUS, log(MSPUS), diff(MSPUS), diff(
 
 ```{r warning=FALSE}
 # Differencing with a lag of 4 after taking log
-tsplot(diff(log(mspus.ts), lag = 4))
-adf.test(diff(log(mspus.ts), lag = 4))
-kpss.test(diff(log(mspus.ts), lag = 4))
-bptest(lm(diff(log(mspus.ts), lag = 4) ~ time(diff(log(mspus.ts), lag = 4))))
+mspus.ts_log4 <- diff(log(mspus.ts), lag = 4)
+tsplot(mspus.ts_log4)
+adf.test(mspus.ts_log4)
+kpss.test(mspus.ts_log4)
+bptest(lm(mspus.ts_log4 ~ time(mspus.ts_log4)))
 
 # Log transformation of the differencing at lag 4 is not carried out because it produces NaNs
 ```
@@ -120,23 +136,81 @@ tsplot(diff(log(mspus.ts), lag = 4), main = "Differencing with lag = 4 after log
 
 ```{r}
 # ACF of transformed outcome variable
-acf(diff(log(mspus.ts), lag = 4), lag.max = 50)
+acf(mspus.ts_log4, lag.max = 50)
 ```
 
 
 ```{r}
-msacsr_trend <- lm(msacsr.ts ~ time(msacsr.ts))
-summary(msacsr_trend)
+#msacsr_trend <- lm(msacsr.ts ~ time(msacsr.ts))
+#summary(msacsr_trend)
 tsplot(msacsr.ts, col ="mediumblue",
        main = "Monthly Supply of New Houses in the United States",
        ylab = "Month's Supply")
-abline(msacsr_trend, col = "red")
-tsplot(resid(msacsr_trend), col = "darkblue",
-       main = "[De-trended] Monthly Supply of New Houses in the United States")
+#abline(msacsr_trend, col = "red")
+#tsplot(resid(msacsr_trend), col = "darkblue",
+#       main = "[De-trended] Monthly Supply of New Houses in the United States")
 adf.test(msacsr.ts)
 kpss.test(msacsr.ts)
-bptest(lm(msacsr.ts ~ time(msacsr.ts)))
-bptest(lm(log(msacsr.ts) ~ time(msacsr.ts)))
+#bptest(lm(msacsr.ts ~ time(msacsr.ts)))
+#bptest(lm(log(msacsr.ts) ~ time(msacsr.ts)))
 ```
 
+Thus the MSACSR series is stationary.
+
+
+```{r}
+tsplot(houst.ts, col ="limegreen",
+       main = "New Privately-Owned Housing Units Started : Total Units",
+       ylab = "Thousands of Units")
+adf.test(houst.ts)
+kpss.test(houst.ts)
+```
+
+The ADF Test & KPSS tests confirm stationarity of HOUST.
+
+```{r}
+tsplot(rhorusq156n.ts, col ="red",
+       main = "Homeownership Rate in the United States",
+       ylab = "Percent")
+adf.test(rhorusq156n.ts)
+kpss.test(rhorusq156n.ts)
+
+rhorusq156n.ts_diff <- diff(rhorusq156n.ts)
+tsplot(rhorusq156n.ts_diff)
+adf.test(rhorusq156n.ts_diff)
+kpss.test(rhorusq156n.ts_diff)
+bptest(lm(rhorusq156n.ts_diff ~ time(rhorusq156n.ts_diff)))
+```
+
+Thus Home Ownership series passes the tests for stationarity and homoscedasticity.
+
+```{r}
+tsplot(mortgage.ts, col ="grey",
+       main = "30-Year Fixed Rate Mortgage Average in the United States", ylab = "Percent")
+adf.test(mortgage.ts)
+kpss.test(mortgage.ts)
+
+mortgage.ts_diff <- diff(mortgage.ts)
+tsplot(mortgage.ts_diff)
+adf.test(mortgage.ts_diff)
+kpss.test(mortgage.ts_diff)
+bptest(lm(mortgage.ts_diff ~ time(mortgage.ts_diff)))
+```
+
+
+```{r}
+# Clipping the series to bring them to the same length
+msacsr.ts <- ts(MSACSR$MSACSR, start = c(1972, 2), frequency = 4, end = c(2023, 4))
+houst.ts <- ts(HOUST$HOUST, start = c(1972, 2), frequency = 4, end = c(2023, 4))
+mortgage.ts <- ts(MORTGAGE30US$MORTGAGE30US, start = c(1972, 1) , frequency = 4, end = c(2023, 4))
+mortgage.ts_diff <- diff(mortgage.ts)
+```
+
+
+```{r}
+trend <- time(mspus.ts_log4)
+reg_model <- lm(mspus.ts_log4 ~ trend + msacsr.ts + houst.ts + mortgage.ts_diff)
+summary(reg_model)
+summary(aov(reg_model))
+```
 
