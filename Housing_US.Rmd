@@ -49,6 +49,7 @@ library(ggfortify)
 library(fpp2)
 library(tseries) # To carry out ADF & KPSS Tests
 library(lmtest) # To carry out BP-Test
+library(stats) # To choose a model by AIC in a Stepwise Algorithm
 
 mspus.ts <- ts(MSPUS$MSPUS[34:244], start = c(1971, 2), frequency = 4)
 cusr.ts <- ts(CUSR0000SA0L2$CUSR0000SA0L2[98:308], start = c(1971, 2), frequency = 4)
@@ -119,81 +120,40 @@ tsplot(resid(mspus_trend), col ="darkblue",
 adf.test(resid(mspus_trend))
 kpss.test(resid(mspus_trend))
 bptest(lm(resid(mspus_trend) ~ time(resid(mspus_trend))))
+```
 
+ADF & KPSS tests conclude stationarity.
 
-mspus.ts.boxcox <- BoxCox(mspus.ts.adj, lambda = -0.35)
-mspus.ts.boxcox.resid <- resid(lm(mspus.ts.boxcox ~ time(mspus.ts.boxcox)))
+The series passes both these tests of stationarity. But the series exhibits an obvious heteroscedasticity where higher levels are associated with higher variation. A BoxCox transformation is recommended.
+
+```{r}
+mspus.ts.boxcox <- BoxCox(mspus.ts.adj, lambda = -0.35) # BoxCox transformation of Adjusted Series
+mspus.ts.boxcox.resid <- resid(lm(mspus.ts.boxcox ~ time(mspus.ts.boxcox))) # De-trending the transformed series
+mspus.ts.boxcox.resid <- ts(mspus.ts.boxcox.resid, start = c(1971, 2), frequency = 4) # Converting to a time series
 tsplot(mspus.ts.boxcox.resid)
 adf.test(mspus.ts.boxcox.resid)
 kpss.test(mspus.ts.boxcox.resid)
 bptest(lm(mspus.ts.boxcox.resid ~ time(mspus.ts.boxcox.resid)))
 ```
 
-ADF & KPSS tests conclude stationarity.
-
-```{r warning=FALSE}
-# Differencing MSPUS Time Series
-tsplot(diff(mspus.ts.adj))
-
-adf.test(diff(mspus.ts.adj))
-kpss.test(diff(mspus.ts.adj))
-bptest(lm(diff(mspus.ts.adj) ~ time(diff(mspus.ts.adj))))
-```
-
-The series passes both these tests of stationarity. But the series exhibits an obvious heteroscedasticity where higher levels are associated with higher variation. A log-transformation is recommended.
-
 ```{r}
-# Log Transformation
-tsplot(log(mspus.ts))
-adf.test(log(mspus.ts))
-kpss.test(log(mspus.ts))
-bptest(lm(log(mspus.ts) ~ time(log(mspus.ts))))
+par(mfcol=c(2,2), cex = 0.5)
+tsplot(mspus.ts, col ="darkorange",
+       main = "Median Sales Price of Houses Sold for the United States",
+       ylab = "USD")
+tsplot(mspus.ts.adj, col ="darkblue",
+       main = "Median Sales Price of Houses Sold for the United States [Adjusted]",
+       ylab = "USD")
+tsplot(mspus.ts.boxcox, col ="green",
+       main = "BoxCox Tranformation of Adjusted Sales Price")
+tsplot(mspus.ts.boxcox.resid, col = "brown", main = "De-trending of BoxCox transform")
 
 
-# Return : Differencing after log transformation
-tsplot(diff(log(mspus.ts)), main = "Return : Differencing after log transformation")
-adf.test(diff(log(mspus.ts)))
-kpss.test(diff(log(mspus.ts)))
-bptest(lm(diff(log(mspus.ts)) ~ time(diff(log(mspus.ts)))))
-```
-
-The return (differencing after log transformation) of MSPUS failed both ADF and KPSS tests of stationarity and BP test of homoscedasticity.
-
-
-
-The BP Test for homoscedasticity fails for MSPUS, log(MSPUS), diff(MSPUS), diff(MSPUS, lag =4),  diff(log(MSPUS)), and diff(resid(mspus_trend)). Will try differencing with a lag of 4 after log transformation.
-
-```{r warning=FALSE}
-# Differencing with lag = 4
-tsplot(diff(mspus.ts, lag = 4))
-adf.test(diff(mspus.ts, lag = 4))
-kpss.test(diff(mspus.ts, lag = 4))
-bptest(lm(diff(mspus.ts, lag = 4) ~ time(diff(mspus.ts, lag = 4))))
-
-# Differencing with a lag of 4 after taking log
-mspus.ts_log4 <- diff(log(mspus.ts), lag = 4)
-tsplot(mspus.ts_log4)
-adf.test(mspus.ts_log4)
-kpss.test(mspus.ts_log4)
-bptest(lm(mspus.ts_log4 ~ time(mspus.ts_log4)))
-
-# Log transformation of the differencing at lag 4 is not carried out because it produces NaNs
-```
-
-
-```{r}
-par(mfrow=c(3,2))
-tsplot(log(mspus.ts), main = "Log Transformation: log(MSPUS)") # Log Transformation
-tsplot(diff(mspus.ts), main = "Differencing with lag = 1") # Differencing
-tsplot(diff(log(mspus.ts)), main = "Return : Differencing after log transformation") # Return (Differencing after log transformation)
-tsplot(diff(residuals(mspus_trend)), main = "Differencing after de-trending") # Differencing after de-trending
-tsplot(diff(mspus.ts, lag = 4), main = "Differencing with lag = 4 (Annual)") # Differencing with a lag of 4
-tsplot(diff(log(mspus.ts), lag = 4), main = "Differencing with lag = 4 after log transformation")
 ```
 
 ```{r}
 # ACF of transformed outcome variable
-acf(diff(mspus.ts))
+acf(diff(mspus.ts.boxcox.resid))
 ```
 
 
@@ -261,13 +221,20 @@ bptest(lm(mortgage.ts_diff ~ time(mortgage.ts_diff)))
 ```{r}
 # Clipping the series to bring them to the same length
 msacsr.ts <- ts(MSACSR$MSACSR[35:244], start = c(1971, 3), frequency = 4)
+mspus.ts.boxcox.resid <- ts(mspus.ts.boxcox.resid, start = c(1971, 3), frequency = 4, end = c(2023, 4))
 ```
 
 
 ```{r}
-trend <- time(diff(mspus.ts))
-reg_model <- lm(diff(mspus.ts) ~ trend + msacsr.ts + houst.ts_diff + mortgage.ts_diff + rhorusq156n.ts_diff)
+trend <- time(mspus.ts.boxcox.resid)
+reg_model <- lm(mspus.ts.boxcox.resid ~ trend + msacsr.ts + houst.ts_diff + mortgage.ts_diff + rhorusq156n.ts_diff)
 summary(reg_model)
 summary(aov(reg_model))
 ```
+
+```{r}
+
+model_1b <- step(reg_model, direction = "both", k =log(210)) # Model Selection by BIC in Stepwise Algorithm
+```
+
 
