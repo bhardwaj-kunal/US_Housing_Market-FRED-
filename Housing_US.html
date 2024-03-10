@@ -565,7 +565,7 @@ acf(diff(mspus.ts.boxcox.resid))</code></pre>
 ## 
 ## data:  lm(msacsr.ts ~ time(msacsr.ts))
 ## BP = 3.154, df = 1, p-value = 0.07574</code></pre>
-<p>Thus the MSACSR series is stationary and homoscedastic.</p>
+<p>Thus the MSACSR series is stationary but NOT homoscedastic.</p>
 <pre class="r"><code>tsplot(houst.ts, col =&quot;limegreen&quot;,
        main = &quot;New Privately-Owned Housing Units Started : Total Units&quot;,
        ylab = &quot;Thousands of Units&quot;)</code></pre>
@@ -617,7 +617,9 @@ tsplot(houst.ts_diff)</code></pre>
 ## data:  lm(houst.ts_diff ~ time(houst.ts_diff))
 ## BP = 11.041, df = 1, p-value = 0.0008914</code></pre>
 <p>The ADF Test confirms stationarity of HOUST but KPSS does not. BP
-Test confirms homoscedasticity.</p>
+Test confirms homoscedasticity. After differencing, ADF &amp; KPSS
+confirm stationarity but the differenced series is no longer
+homoscedastic.</p>
 <pre class="r"><code>tsplot(rhorusq156n.ts, col =&quot;red&quot;,
        main = &quot;Homeownership Rate in the United States&quot;,
        ylab = &quot;Percent&quot;)</code></pre>

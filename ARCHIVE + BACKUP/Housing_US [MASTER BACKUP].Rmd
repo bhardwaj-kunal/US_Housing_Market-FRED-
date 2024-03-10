@@ -1,0 +1,277 @@
+---
+title: 'STAT 429 Project Proposal: US Housing Market'
+author: "Kunal Bhardwaj,     NetID: kunal5,     Section: GR"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+# Nature of Data
+
+Federal Reserve Economic Data (FRED) is a comprehensive database maintained by the Federal Reserve Bank of St. Louis. It provides access to a wide range of economic data, including economic indicators, financial and banking data, monetary data, and regional data for the United States. FRED aggregates data from various government agencies, international organizations, and other sources, making it a valuable resource for researchers, economists, policymakers, and the general public.
+
+
+The objective is to predict the Median Sales price of houses sold in the United States based on several factors. The structure of the data is outlined below:
+
+### Monthly Supply of New Houses in the United States (MSACSR) [Quarterly Adjusted]
+
+The months' supply is the ratio of new houses for sale to new houses sold. This statistic provides an indication of the size of the new for-sale inventory in relation to the number of new houses currently being sold. The months' supply indicates how long the current new for-sale inventory would last given the current sales rate if no additional new houses were built.
+
+SOURCE: U.S. Census Bureau and U.S. Department of Housing and Urban Development, Median Sales Price of Houses Sold for the United States [MSPUS], retrieved from FRED, Federal Reserve Bank of St. Louis; https://fred.stlouisfed.org/series/MSPUS
+
+### New Privately-Owned Housing Units Started: Total Units (HOUST) [Quarterly Adjusted]
+
+As provided by the Census, start occurs when excavation begins for the footings or foundation of a building. Increases in housing starts and permits indicate growing supply, which can help alleviate housing shortages and moderate price growth. Conversely, declines in construction activity may contribute to supply constraints and upward pressure on prices.
+
+SOURCE: U.S. Census Bureau and U.S. Department of Housing and Urban Development, New Privately-Owned Housing Units Started: Total Units [HOUST], retrieved from FRED, Federal Reserve Bank of St. Louis; https://fred.stlouisfed.org/series/HOUST
+
+### Homeownership Rate in the United States (RHORUSQ156N)
+
+The homeownership rate is the proportion of households that is owner-occupied.
+
+SOURCE: U.S. Census Bureau, Homeownership Rate in the United States [RHORUSQ156N], retrieved from FRED, Federal Reserve Bank of St. Louis; https://fred.stlouisfed.org/series/RHORUSQ156N
+
+### 30-Year Fixed Rate Mortgage Average in the United States (MORTGAGE30US) [Quarterly Adjusted]
+
+On November 17, 2022, Freddie Mac changed the methodology of the Primary Mortgage Market Survey® (PMMS®). The weekly mortgage rate is now based on applications submitted to Freddie Mac from lenders across the country.
+
+SOURCE: Freddie Mac, 30-Year Fixed Rate Mortgage Average in the United States [MORTGAGE30US], retrieved from FRED, Federal Reserve Bank of St. Louis; https://fred.stlouisfed.org/series/MORTGAGE30US
+
+
+# Questions to be answered
+
+The objective is to predict the Median Sales price of houses sold in the United States based on factors like:
+
+i) Monthly supply of New Houses in the United States
+ii) New Privately-owned Housing units started
+iii) Home ownership rate in the United States
+iv) 30-Year Fixed Rate Mortgage Average in the United States
+
+The Median Sales Price will be adjusted based on "Consumer Price Index (CPI) for all Urban Consumers: All items less shelter". This will give us an idea of how much house prices have risen in excess of inflation in other commodities.
+
+The project will try to answer if the Median Sales price of houses sold in the United States is affected by any of the four abovementioned factors or not. We will also try to answer which factors have a statistically significant effect on median prices.
+
+# Time Series Plots
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+library(readr)
+MSPUS <- read_csv("Data/MSPUS.csv",
+                  col_types = cols(DATE = col_date(format = "%Y-%m-%d")))
+
+CUSR0000SA0L2 <- read_csv("Data/CUSR0000SA0L2.csv",
+                          col_types = cols(DATE = col_date(format = "%Y-%m-%d"),
+                                           CUSR0000SA0L2 = col_double()))
+
+MSACSR <- read_csv("Data/MSACSR.csv",
+                   col_types = cols(DATE = col_date(format = "%Y-%m-%d")))
+
+HOUST <- read_csv("Data/HOUST.csv",
+                  col_types = cols(DATE = col_date(format = "%Y-%m-%d"),
+                                   HOUST = col_number()))
+
+RHORUSQ156N <- read_csv("Data/RHORUSQ156N.csv", 
+    col_types = cols(DATE = col_date(format = "%Y-%m-%d")))
+
+MORTGAGE30US <- read_csv("Data/MORTGAGE30US.csv",
+                         col_types = cols(DATE = col_date(format = "%Y-%m-%d"),
+                                          MORTGAGE30US = col_number()))
+```
+
+```{r message=FALSE, echo=FALSE}
+library(astsa)
+library(ggplot2)
+library(ggfortify)
+library(fpp2)
+library(tseries) # To carry out ADF & KPSS Tests
+library(lmtest) # To carry out BP-Test
+library(stats) # To choose a model by AIC in a Stepwise Algorithm
+
+mspus.ts <- ts(MSPUS$MSPUS[34:244], start = c(1971, 2), frequency = 4)
+cusr.ts <- ts(CUSR0000SA0L2$CUSR0000SA0L2[98:308], start = c(1971, 2), frequency = 4)
+
+msacsr.ts <- ts(MSACSR$MSACSR[34:244], start = c(1971, 2), frequency = 4)
+houst.ts <- ts(HOUST$HOUST[50:261], start = c(1971, 2), frequency = 4, end = c(2023, 4))
+rhorusq156n.ts <- ts(RHORUSQ156N$RHORUSQ156N[26:236], start = c(1971, 2), frequency = 4)
+mortgage.ts <- ts(MORTGAGE30US$MORTGAGE30US, start = c(1971, 2) , frequency = 4, end = c(2023, 4))
+
+
+tsplot(mspus.ts, col ="darkorange",
+       main = "Median Sales Price of Houses Sold for the United States",
+       ylab = "USD")
+
+mspus.ts.adj <- mspus.ts/cusr.ts*100
+lines(mspus.ts.adj, col = "mediumblue")
+legend("topleft", legend = c("Real Prices", "Adjusted for Inflation"), col = c("darkorange", "mediumblue"), lty = 1)
+```
+
+From the plot of Median Sales Price of Houses Sold, we can see that there exists an obvious trend in the data. Therefore de-trending needs to be carried out to achieve stationarity.
+
+# Plans for Analysis
+
+# Basic Ideas about Analysis C
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r message=FALSE, echo=FALSE}
+par(mfrow=c(4,1))
+tsplot(msacsr.ts, col ="mediumblue",
+       main = "Monthly Supply of New Houses in the United States",
+       ylab = "Month's Supply")
+tsplot(houst.ts, col ="limegreen",
+       main = "New Privately-Owned Housing Units Started : Total Units",
+       ylab = "Thousands of Units")
+tsplot(rhorusq156n.ts, col ="red",
+       main = "Homeownership Rate in the United States",
+       ylab = "Percent")
+tsplot(mortgage.ts, col ="purple",
+       main = "30-Year Fixed Rate Mortgage Average in the United States", ylab = "Percent")
+```
+
+```{r warning=FALSE, echo=FALSE}
+# De-trending MSPUS Time Series
+mspus_trend <- lm(mspus.ts.adj ~ time(mspus.ts.adj))
+
+par(mfrow=c(2,1))
+tsplot(mspus.ts.adj, col ="darkblue",
+       main = "Median Sales Price of Houses Sold for the United States [Adjusted]",
+       ylab = "USD")
+abline(mspus_trend, col = "red")
+tsplot(resid(mspus_trend), col ="darkblue",
+       main = "[De-trended] Median Sales Price of Houses Sold for the United States",
+       ylab = "Residual")
+
+# check for Stationarity using (Augmented) Dickey-Fuller Test and KPSS Test
+adf.test(resid(mspus_trend))
+kpss.test(resid(mspus_trend))
+bptest(lm(resid(mspus_trend) ~ time(resid(mspus_trend))))
+```
+
+ADF & KPSS tests conclude stationarity.
+
+The series passes both these tests of stationarity. But the series exhibits an obvious heteroscedasticity where higher levels are associated with higher variation. A BoxCox transformation is recommended.
+
+```{r, echo=FALSE}
+mspus.ts.boxcox <- BoxCox(mspus.ts.adj, lambda = -0.35) # BoxCox transformation of Adjusted Series
+mspus.ts.boxcox.resid <- resid(lm(mspus.ts.boxcox ~ time(mspus.ts.boxcox))) # De-trending the transformed series
+mspus.ts.boxcox.resid <- ts(mspus.ts.boxcox.resid, start = c(1971, 2), frequency = 4) # Converting to a time series
+tsplot(mspus.ts.boxcox.resid)
+adf.test(mspus.ts.boxcox.resid)
+kpss.test(mspus.ts.boxcox.resid)
+bptest(lm(mspus.ts.boxcox.resid ~ time(mspus.ts.boxcox.resid)))
+```
+
+```{r, echo=FALSE}
+par(mfcol=c(2,2), cex = 0.5)
+tsplot(mspus.ts, col ="darkorange",
+       main = "Median Sales Price of Houses Sold for the United States",
+       ylab = "USD")
+tsplot(mspus.ts.adj, col ="darkblue",
+       main = "Median Sales Price of Houses Sold for the United States [Adjusted]",
+       ylab = "USD")
+tsplot(mspus.ts.boxcox, col ="green",
+       main = "BoxCox Tranformation of Adjusted Sales Price")
+tsplot(mspus.ts.boxcox.resid, col = "brown", main = "De-trending of BoxCox transform")
+
+
+```
+
+```{r, echo=FALSE}
+# ACF of transformed outcome variable
+acf(diff(mspus.ts.boxcox.resid))
+```
+
+
+```{r, echo=FALSE}
+tsplot(msacsr.ts, col ="mediumblue",
+       main = "Monthly Supply of New Houses in the United States",
+       ylab = "Month's Supply")
+adf.test(msacsr.ts)
+kpss.test(msacsr.ts)
+bptest(lm(msacsr.ts ~ time(msacsr.ts)))
+```
+
+Thus the MSACSR series is stationary but NOT homoscedastic.
+
+
+```{r, echo=FALSE}
+tsplot(houst.ts, col ="limegreen",
+       main = "New Privately-Owned Housing Units Started : Total Units",
+       ylab = "Thousands of Units")
+adf.test(houst.ts)
+kpss.test(houst.ts)
+bptest(lm(houst.ts ~ time(houst.ts)))
+
+# Differencing
+houst.ts_diff <- diff(houst.ts)
+tsplot(houst.ts_diff)
+adf.test(houst.ts_diff)
+kpss.test(houst.ts_diff)
+bptest(lm(houst.ts_diff ~ time(houst.ts_diff)))
+```
+
+The ADF Test confirms stationarity of HOUST but KPSS does not. BP Test confirms homoscedasticity. After differencing, ADF & KPSS confirm stationarity but the differenced series is no longer homoscedastic.
+
+```{r, echo=FALSE}
+tsplot(rhorusq156n.ts, col ="red",
+       main = "Homeownership Rate in the United States",
+       ylab = "Percent")
+adf.test(rhorusq156n.ts)
+kpss.test(rhorusq156n.ts)
+
+rhorusq156n.ts_diff <- diff(rhorusq156n.ts)
+tsplot(rhorusq156n.ts_diff)
+adf.test(rhorusq156n.ts_diff)
+kpss.test(rhorusq156n.ts_diff)
+bptest(lm(rhorusq156n.ts_diff ~ time(rhorusq156n.ts_diff)))
+```
+
+Thus Home Ownership series passes the tests for stationarity and homoscedasticity after differencing.
+
+```{r, echo=FALSE}
+tsplot(mortgage.ts, col ="grey",
+       main = "30-Year Fixed Rate Mortgage Average in the United States", ylab = "Percent")
+adf.test(mortgage.ts)
+kpss.test(mortgage.ts)
+
+mortgage.ts_diff <- diff(mortgage.ts)
+tsplot(mortgage.ts_diff)
+adf.test(mortgage.ts_diff)
+kpss.test(mortgage.ts_diff)
+bptest(lm(mortgage.ts_diff ~ time(mortgage.ts_diff)))
+```
+
+
+
+```{r, echo=FALSE}
+# Clipping the series to bring them to the same length
+msacsr.ts <- ts(MSACSR$MSACSR[35:244], start = c(1971, 3), frequency = 4)
+mspus.ts.boxcox.resid <- ts(mspus.ts.boxcox.resid, start = c(1971, 3), frequency = 4, end = c(2023, 4))
+```
+
+
+```{r, echo=FALSE}
+trend <- time(mspus.ts.boxcox.resid)
+reg_model <- lm(mspus.ts.boxcox.resid ~ trend + msacsr.ts + houst.ts_diff + mortgage.ts_diff + rhorusq156n.ts_diff)
+summary(reg_model)
+summary(aov(reg_model))
+```
+
+```{r, echo=FALSE}
+
+model_1b <- step(reg_model, direction = "both", k =log(210)) # Model Selection by BIC in Stepwise Algorithm
+```
+
+
