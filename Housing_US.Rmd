@@ -1,24 +1,48 @@
 ---
-title: 'STAT 429 Project Proposal: US Housing Market'
+title: 'STAT 429 Project Proposal'
 author: "Kunal Bhardwaj,     NetID: kunal5,     Section: GR"
-output:
+output: 
   pdf_document: default
   html_document: default
 ---
 
+# Understanding Housing Market Trends and Risks :
+# An Analytical Study
+
+
 ## Nature of Data
 
-Federal Reserve Economic Data (FRED) is a comprehensive database maintained by the Federal Reserve Bank of St. Louis. It provides access to a wide range of economic data, including economic indicators, financial and banking data, monetary data, and regional data for the United States. FRED aggregates data from various government agencies, international organizations, and other sources, making it a valuable resource for researchers, economists, policymakers, and the general public.
+*Federal Reserve Economic Data (FRED)* is a comprehensive database maintained by the Federal Reserve Bank of St. Louis. It provides access to a wide range of economic data, including economic indicators, financial and banking data, monetary data, and regional data for the United States. FRED aggregates data from various government agencies, international organizations, and other sources, making it a valuable resource for researchers, economists, policymakers, and the general public.
+
+The dataset retrieved from *FRED* website comprises of six time series:
+
+i) Median Sales Price of Houses Sold for the United States
+
+ii) Monthly supply of New Houses in the United States
+
+iii) New Privately owned Housing units started
+
+iv) Home ownership rate in the United States
+
+v) 30 Year Fixed Rate Mortgage Average in the United States
+
+vi) Consumer Price Index (CPI) for All Urban Consumers: All Items Less Shelter in U.S. City Average
 
 
-The objective is to predict the Median Sales price of houses sold in the United States based on several factors. The structure of the data is outlined below:
+The objective of the project will be to predict Median Price *(i)* based on four other factors *(ii), (iii), (iv) & (v)*. The CPI data *(vi)* will not be used as a predictor but will be used to adjust Median Price based on inflation.
 
-### Median Sales Price of Houses Sold for the United States (MSPUS) [Quarterly] [Q1'63 - Q4'23]
+
+These four variables are fundamental drivers influencing the supply and demand dynamics of the housing market. For instance, the monthly supply of new houses and new housing units started *(ii)* offer insights into the supply side of the market, while the home ownership rate *(iv)* reflects the demand for housing. Moreover, the 30 year fixed rate mortgage average *(v)* directly impacts affordability and purchasing power, crucial factors influencing housing demand.
+
+
+The structure of the data is outlined below.
+
+## Median Sales Price of Houses Sold for the United States (MSPUS) [Quarterly] [Q1'63   Q4'23]
 **OUTCOME VARIABLE**
 
 The Median Sales Price of Houses Sold for the United States in US Dollars. The original data has not been seasonally adjusted.
 
-```{r message=FALSE, warning=FALSE, echo=FALSE}
+```{r message=FALSE, warning=FALSE, echo=FALSE, warning=FALSE}
 library(readr)
 MSPUS <- read_csv("Data/MSPUS.csv",
                   col_types = cols(DATE = col_date(format = "%Y-%m-%d")))
@@ -42,7 +66,7 @@ MORTGAGE30US <- read_csv("Data/MORTGAGE30US.csv",
                                           MORTGAGE30US = col_number()))
 ```
 
-```{r message=FALSE, echo=FALSE}
+```{r message=FALSE, echo=FALSE, fig.dim = c(6, 3), warning=FALSE}
 library(astsa)
 library(ggplot2)
 library(ggfortify)
@@ -66,79 +90,98 @@ tsplot(mspus.ts, col ="darkorange",
 
 mspus.ts.adj <- mspus.ts/cusr.ts*100
 lines(mspus.ts.adj, col = "mediumblue")
-legend("topleft", legend = c("Real Prices", "Adjusted for Inflation"), col = c("darkorange", "mediumblue"), lty = 1)
+legend("topleft", legend = c("Real Prices", "Adjusted for Inflation (CPI)"), col = c("darkorange", "mediumblue"), lty = 1)
 ```
 
-From the plot of Median Sales Price of Houses Sold, we can see that there exists an obvious trend in the data.
+From the plot of Median Sales Price of Houses Sold, we can see that there exists an obvious trend in the data. The Median Prices will be adjusted for inflation based on 1982:1984 prices to make median housing prices from different years directly comparable. This is crucial for understanding long term trends in housing prices and assessing changes in affordability over time.
 
-SOURCE: U.S. Census Bureau and U.S. Department of Housing and Urban Development, Median Sales Price of Houses Sold for the United States [MSPUS], retrieved from FRED, Federal Reserve Bank of St. Louis; https://fred.stlouisfed.org/series/MSPUS
+Moreover, adjusting median housing prices for inflation should lead to more accurate forecasts by avoid biases introduced by price shocks in commodity prices, the effect of which have not been included in the model.
 
-### Monthly Supply of New Houses in the United States (MSACSR) [Monthly] [Jan'63 - Dec'23]
+SOURCE: *U.S. Census Bureau and U.S. Department of Housing and Urban Development, Median Sales Price of Houses Sold for the United States [MSPUS], retrieved from FRED, Federal Reserve Bank of St. Louis;*   https://fred.stlouisfed.org/series/MSPUS
+
+## Monthly Supply of New Houses in the United States (MSACSR) [Monthly] [Jan'63 - Dec'23]
 **Predictor variable 1**
 
 The months' supply is the ratio of new houses for sale to new houses sold. This statistic provides an indication of the size of the new for-sale inventory in relation to the number of new houses currently being sold. The months' supply indicates how long the current new for-sale inventory would last given the current sales rate if no additional new houses were built.
 
-SOURCE: U.S. Census Bureau and U.S. Department of Housing and Urban Development, Monthly Supply of New Houses in the United States [MSACSR], retrieved from FRED, Federal Reserve Bank of St. Louis; https://fred.stlouisfed.org/series/MSACSR
+```{r message=FALSE, echo=FALSE, fig.dim = c(6, 2)}
+tsplot(msacsr.ts, col ="mediumblue",
+       main = "Monthly Supply of New Houses in the United States",
+       ylab = "Month's Supply")
+```
+
+SOURCE: *U.S. Census Bureau and U.S. Department of Housing and Urban Development, Monthly Supply of New Houses in the United States [MSACSR], retrieved from FRED, Federal Reserve Bank of St. Louis;*   https://fred.stlouisfed.org/series/MSACSR
 
 
-### New Privately-Owned Housing Units Started: Total Units (HOUST) [Monthly] [Jan'59 - Jan'24]
+## New Privately-Owned Housing Units Started: Total Units (HOUST) [Monthly] [Jan'59 - Jan'24]
 **Predictor variable 2**
 
 As provided by the Census, start occurs when excavation begins for the footings or foundation of a building. Increases in housing starts and permits indicate growing supply, which can help alleviate housing shortages and moderate price growth. Conversely, declines in construction activity may contribute to supply constraints and upward pressure on prices.
 
-SOURCE: U.S. Census Bureau and U.S. Department of Housing and Urban Development, New Privately-Owned Housing Units Started: Total Units [HOUST], retrieved from FRED, Federal Reserve Bank of St. Louis; https://fred.stlouisfed.org/series/HOUST
+```{r message=FALSE, echo=FALSE, fig.dim = c(6, 2)}
+tsplot(houst.ts, col ="limegreen",
+       main = "New Privately-Owned Housing Units Started : Total Units",
+       ylab = "Thousands of Units")
+```
+
+SOURCE: *U.S. Census Bureau and U.S. Department of Housing and Urban Development, New Privately-Owned Housing Units Started: Total Units [HOUST], retrieved from FRED, Federal Reserve Bank of St. Louis;*   https://fred.stlouisfed.org/series/HOUST
 
 
-### Homeownership Rate in the United States (RHORUSQ156N) [Quarterly] [Q1 '65 - Q4'23]
+## Homeownership Rate in the United States (RHORUSQ156N) [Quarterly] [Q1 '65 - Q4'23]
 **Predictor variable 3**
 
 The homeownership rate is the proportion of households that is owner-occupied.
 
-SOURCE: U.S. Census Bureau, Homeownership Rate in the United States [RHORUSQ156N], retrieved from FRED, Federal Reserve Bank of St. Louis; https://fred.stlouisfed.org/series/RHORUSQ156N
+SOURCE: *U.S. Census Bureau, Homeownership Rate in the United States [RHORUSQ156N], retrieved from FRED, Federal Reserve Bank of St. Louis;* https://fred.stlouisfed.org/series/RHORUSQ156N
 
 
-### 30-Year Fixed Rate Mortgage Average in the United States (MORTGAGE30US) [Weekly] [Apr'71 - Feb'24]
-**Predictor variable 4**
-
-On November 17, 2022, Freddie Mac changed the methodology of the Primary Mortgage Market Survey® (PMMS®). The weekly mortgage rate is now based on applications submitted to Freddie Mac from lenders across the country.
-
-SOURCE: Freddie Mac, 30-Year Fixed Rate Mortgage Average in the United States [MORTGAGE30US], retrieved from FRED, Federal Reserve Bank of St. Louis; https://fred.stlouisfed.org/series/MORTGAGE30US
-
-```{r message=FALSE, echo=FALSE}
-par(mfrow=c(4,1))
-tsplot(msacsr.ts, col ="mediumblue",
-       main = "Monthly Supply of New Houses in the United States",
-       ylab = "Month's Supply")
-tsplot(houst.ts, col ="limegreen",
-       main = "New Privately-Owned Housing Units Started : Total Units",
-       ylab = "Thousands of Units")
+```{r message=FALSE, echo=FALSE, fig.dim = c(6, 2)}
 tsplot(rhorusq156n.ts, col ="red",
        main = "Homeownership Rate in the United States",
        ylab = "Percent")
+```
+
+## 30-Year Fixed Rate Mortgage Average in the United States (MORTGAGE30US) [Weekly] [Apr'71 - Feb'24]
+**Predictor variable 4**
+
+The 30-Year Fixed Rate Mortgage Average in the United States refers to the average interest rate for a 30-year fixed-rate mortgage across the country. It's a key indicator used by borrowers, lenders, economists, and policymakers to understand trends in the housing market and to make decisions related to home buying, refinancing, and economic policy.
+On November 17, 2022, Freddie Mac changed the methodology of the Primary Mortgage Market Survey® (PMMS®). The weekly mortgage rate is now based on applications submitted to Freddie Mac from lenders across the country.
+
+SOURCE: *Freddie Mac, 30-Year Fixed Rate Mortgage Average in the United States [MORTGAGE30US], retrieved from FRED, Federal Reserve Bank of St. Louis;*   https://fred.stlouisfed.org/series/MORTGAGE30US
+
+```{r message=FALSE, echo=FALSE, fig.dim = c(6, 2)}
 tsplot(mortgage.ts, col ="purple",
        main = "30-Year Fixed Rate Mortgage Average in the United States", ylab = "Percent")
 ```
 
-### Consumer Price Index for All Urban Consumers: All Items Less Shelter in U.S. City Average (CUSR0000SA0L2) [Monthly] [Jan'47 - Jan'24]
-**Additional Variable [Not to be used in Regression]**
+## Consumer Price Index for All Urban Consumers: All Items Less Shelter in U.S. City Average (CUSR0000SA0L2) [Monthly] [Jan'47 - Jan'24]
+**Additional Variable [NOT to be used as a predictor]**
 
-The Median Sales Price will be adjusted based on "Consumer Price Index (CPI) for all Urban Consumers: All items less shelter". This will give us an idea of how much house prices have risen in excess of inflation in other commodities.
+The Median Sales Price will be adjusted based on "Consumer Price Index (CPI) for all Urban Consumers: All items less shelter". The "All Items Less Shelter" component of the CPI-U specifically excludes the cost of shelter (such as rent or homeownership costs) from the basket of goods and services being measured. This means that it focuses solely on tracking changes in the prices of goods and services other than housing-related expenses. Adjusting median prices based on CPI will help us better understand underlying factors driving inflationary pressure in the housing sector.
 
-SOURCE: U.S. Bureau of Labor Statistics, Consumer Price Index for All Urban Consumers: All Items Less Shelter in U.S. City Average [CUSR0000SA0L2], retrieved from FRED, Federal Reserve Bank of St. Louis; https://fred.stlouisfed.org/series/CUSR0000SA0L2
+```{r, echo=FALSE, fig.dim = c(6, 2)}
+tsplot(cusr.ts, col ="darkorange",
+       main = "Consumer Price Index (CPI)",
+       ylab = "Index 1982-1984=100")
+```
+
+
+SOURCE: *U.S. Bureau of Labor Statistics, Consumer Price Index for All Urban Consumers: All Items Less Shelter in U.S. City Average [CUSR0000SA0L2], retrieved from FRED, Federal Reserve Bank of St. Louis;*   https://fred.stlouisfed.org/series/CUSR0000SA0L2
 
 ## Questions to be answered
 
-The objective is to predict the Median Sales price of houses sold in the United States based on factors like:
+The primary objective is to predict the Median Sales price of houses sold in the United States based on four factors:
 
 i) Monthly supply of New Houses in the United States
 ii) New Privately-owned Housing units started
 iii) Home ownership rate in the United States
 iv) 30-Year Fixed Rate Mortgage Average in the United States
 
+We will try to answer which (if any) of the four factors have the strongest effect on the Median Sales price of houses sold. We will also try to answer which factor has the strongest effect on median prices. Analysis A will be used to answer these questions.
 
-The project will try to answer if the Median Sales price of houses sold in the United States is affected by any of the four above-mentioned factors or not. We will also try to answer which factors have a statistically significant effect on median prices.
+We will also try to gauge how volatile are prices to shocks in supply, housing starts, and Mortgage rates. Analysis C will consist of analyzing volatility patterns to better understand these factors. 
 
-## Time Series Plots
+## Viability Plots
 
 ```{r warning=FALSE, echo=FALSE}
 # De-trending MSPUS Time Series
@@ -146,20 +189,40 @@ mspus_trend <- lm(mspus.ts.adj ~ time(mspus.ts.adj))
 
 par(mfrow=c(2,1))
 tsplot(mspus.ts.adj, col ="darkblue",
-       main = "Median Sales Price of Houses Sold for the United States [Adjusted]",
+       main = "Median Sales Price of Houses Sold in United States [Adjusted]",
        ylab = "USD")
 abline(mspus_trend, col = "red")
 tsplot(resid(mspus_trend), col ="darkblue",
-       main = "[De-trended] Median Sales Price of Houses Sold for the United States",
+       main = "[De-trended] Median Sales Price of Houses Sold in United States",
        ylab = "Residual")
 ```
+
+Preliminary adjustments indicate that median prices can be make stationary before regression with some adjustment for the heteroscastic behavior present in the series. 
 
 ## Plans for Analysis
 
 **ANALYSIS A **
-The time series data of median price [MSPUS] will be regressed on time (t) and four other independent variables. 
-Multiple model sizes can be analyzed and the optimum model can be selected based on AIC/BIC criteria.
+The time series data of median price [MSPUS] will be regressed on time *(t)* and the four other independent variables.
+
+STEP 1) The Median Prices (outcome variable) will be pre processed by adjusting for inflation, followed by detrending and log transformation to make it stationary and homoscedastic.
+
+STEP 2) The four predictor variables will be converted into quarterly series if they are not already.
+
+STEP 3) The Median Price will be regressed on time and other predictors to arrive at the full model.
+
+STEP 3.5) Multiple model sizes will be analyzed to find the optimum model to be selected, based on AIC/BIC criteria.
+
+STEP 4) Based on the p/ACF of the residuals, we may conduct regression with autocorrelated errors.
 
 ## Basic Ideas about Analysis C
 
-The median price of houses can also be predicted using Spectral Analysis or ARCH/GARCH models. The spectral analysis will require decomposing the time series into its constituent frequencies while ARCH/GARCH models can be used to model the return/growth rate of median prices.
+As can be seen from the plots of predictor variables *(i), (ii), & (iv)*, there exists "shocks" in these variables. Analysis C will focus on understanding how volatile are mdedian prices to shocks in 'Monthly Supply of New Houses'*(supply side)*, 'New Privately Owned Housing Units Started' *(demand side)*, and '30 Year Fixed Rate Mortgage' *(Cost of Borrowing)*.
+
+In particuler, we can try to explore two ideas: 
+
+
+1) **Volatility Patterns:** How does volatility in housing prices and related variables behave over different frequencies? Spectral analysis can reveal cyclical patterns in volatility, while GARCH, APARCH, and IGARCH models can help identify and model the conditional heteroskedasticity in the data.
+
+2) **Asymmetry in Volatility:** Are there asymmetries in the response of housing prices to shocks? APARCH models are particularly useful for capturing asymmetries in volatility, allowing for a more nuanced understanding of how positive and negative shocks impact housing market dynamics differently.
+
+The spectral analysis will require decomposing the time series into its constituent frequencies while ARCH/GARCH models will be used to model the return/growth rate of median prices.
