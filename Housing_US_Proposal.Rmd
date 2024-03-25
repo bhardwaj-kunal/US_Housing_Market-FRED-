@@ -75,6 +75,8 @@ library(tseries) # To carry out ADF & KPSS Tests
 library(lmtest) # To carry out BP-Test
 library(stats) # To choose a model by AIC in a Stepwise Algorithm
 
+options(scipen = 999)
+
 mspus.ts <- ts(MSPUS$MSPUS[34:244], start = c(1971, 2), frequency = 4)
 cusr.ts <- ts(CUSR0000SA0L2$CUSR0000SA0L2[98:308], start = c(1971, 2), frequency = 4)
 
@@ -84,11 +86,11 @@ rhorusq156n.ts <- ts(RHORUSQ156N$RHORUSQ156N[26:236], start = c(1971, 2), freque
 mortgage.ts <- ts(MORTGAGE30US$MORTGAGE30US, start = c(1971, 2) , frequency = 4, end = c(2023, 4))
 
 
-tsplot(mspus.ts, col ="darkorange",
+tsplot(mspus.ts/1000, col ="darkorange",
        main = "Median Sales Price of Houses Sold for the United States",
-       ylab = "USD")
+       ylab = "Thousands of USD")
 
-mspus.ts.adj <- mspus.ts/cusr.ts*100
+mspus.ts.adj <- (mspus.ts/1000)/cusr.ts*100
 lines(mspus.ts.adj, col = "mediumblue")
 legend("topleft", legend = c("Real Prices", "Adjusted for Inflation (CPI)"), col = c("darkorange", "mediumblue"), lty = 1)
 ```
