@@ -112,19 +112,6 @@ From the plot of Median Sales Price of Houses Sold, we can see that there exists
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 ```{r message=FALSE, echo=FALSE}
 par(mfrow=c(4,1))
 tsplot(msacsr.ts, col ="mediumblue",
@@ -164,7 +151,9 @@ ADF & KPSS tests conclude stationarity.
 The series passes both these tests of stationarity. But the series exhibits an obvious heteroscedasticity where higher levels are associated with higher variation. A BoxCox transformation is recommended.
 
 ```{r, echo=FALSE}
-mspus.ts.boxcox <- BoxCox(mspus.ts.adj, lambda = -0.35) # BoxCox transformation of Adjusted Series
+optim_lambda <- BoxCox.lambda(mspus.ts.adj, method = c("guerrero", "loglik"),
+                              lower = -2, upper = 2)
+mspus.ts.boxcox <- BoxCox(mspus.ts.adj, lambda = optim_lambda) # BoxCox transformation of Adjusted Series
 mspus.ts.boxcox.resid <- resid(lm(mspus.ts.boxcox ~ time(mspus.ts.boxcox))) # De-trending the transformed series
 mspus.ts.boxcox.resid <- ts(mspus.ts.boxcox.resid, start = c(1971, 2), frequency = 4) # Converting to a time series
 tsplot(mspus.ts.boxcox.resid)

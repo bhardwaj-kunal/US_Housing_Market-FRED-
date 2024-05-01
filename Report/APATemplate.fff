@@ -1,0 +1,7 @@
+\begin{figure*}[hbt]
+\ifnextchar[{\eatarg}{}
+
+\centering
+\includegraphics{APATemplate_files/figure-latex/unnamed-chunk-1-1.pdf}
+\caption{\label{fig:unnamed-chunk-1}an amazing acf function}
+\end{figure*}
