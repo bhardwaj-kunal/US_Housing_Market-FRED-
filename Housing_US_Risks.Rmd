@@ -42,6 +42,8 @@ library(tseries) # To carry out ADF & KPSS Tests
 library(lmtest) # To carry out BP-Test
 library(stats) # To choose a model by AIC in a Step-wise Algorithm
 library(ldsr) # To carry out a Reverse BoxCox Transformation
+library(rugarch) # GARCH Model
+library(forecast)
 
 options(scipen = 999)
 
@@ -199,7 +201,6 @@ The Ljung-Box test concludes that the residuals are not independently distribute
 ```{r}
 acf(chosen_model$residuals)
 pacf(chosen_model$residuals)
-
 ```
 
 ACF cuts off after 1
@@ -212,13 +213,12 @@ p=1
 q=1
 
 We will now fit a ARMA(1,1) model and carry out forecasting.
-
 ```{r}
 sarima(mspus.box.diff, p = 1, d = 0, q = 1)
 forecast1 <- sarima.for(mspus.box.diff, n.ahead = 5, p = 1, d = 0, q = 1)
 ```
 
-The ACF of residuals show that they resemble white noise.
+The ACF of residuals show that they now resemble white noise.
 
 ```{r}
 new_vals <- cumsum(c(mspus.ts.boxcox[211],forecast1$pred))
@@ -257,7 +257,25 @@ In particular, we can try to explore two ideas:
 The spectral analysis will require decomposing the time series into its constituent frequencies while ARCH/GARCH models will be used to model the return/growth rate of median prices.
 
 ```{r}
+mspus.spectrum <- spectrum(mspus.ts.adj, log = "no")
 
 ```
+GARCH models assume stationarity. Therefore we will use the log-differenced series for GARCH model which was shown to be stationary earlier.
 
+```{r}
+# Define GARCH model specification
+spec <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)),
+                   mean.model = list(armaOrder = c(0, 0), include.mean = TRUE))
+
+fit <- ugarchfit(spec = spec, data = mspus.box.diff)
+
+summary(fit)
+
+# Diagnostic plots
+plot(fit, which = 1)
+
+# Forecasting future values
+forecasts <- ugarchforecast(fit, n.ahead = 10)
+plot(forecasts, which = 1)  # Plotting the forecasted values
+```
 
