@@ -270,16 +270,28 @@ pacf(mspus.box.diff)
 sarima101 <- sarima(mspus.ts.boxcox, p = 1, d = 1, q = 1)
 summary(sarima101)
 sarima.for(mspus.ts.boxcox, p = 1, d = 1, q = 1, n.ahead = 5)
-
-spec <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)),
-                   mean.model = list(armaOrder = c(1,1), include.mean = TRUE)) # Standard GARCH
-
-fit <- ugarchfit(spec = spec, data = mspus.box.diff)
-
-summary(fit)
-plot(fit, which = 1)
-
-forecasts <- ugarchforecast(fit, n.ahead = 5)
-plot(forecasts, which = 1)
 ```
 
+```{r}
+GARCH_spec <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)),
+                   mean.model = list(armaOrder = c(1,1), include.mean = TRUE)) # Standard GARCH
+IGARCH_spec <- ugarchspec(variance.model = list(model = "iGARCH", garchOrder = c(1, 1)),
+                   mean.model = list(armaOrder = c(1,1), include.mean = TRUE)) # Integrated GARCH
+APARCH_spec <- ugarchspec(variance.model = list(model = "apARCH", garchOrder = c(1, 1)),
+                   mean.model = list(armaOrder = c(1,1), include.mean = TRUE)) # Asymmetric Power ARCH
+GARCH_fit <- ugarchfit(spec = GARCH_spec, data = mspus.box.diff)
+IGARCH_fit <- ugarchfit(spec = IGARCH_spec, data = mspus.box.diff)
+APARCH_fit <- ugarchfit(spec = APARCH_spec, data = mspus.box.diff)
+
+
+plot(GARCH_fit, which = 1)
+plot(IGARCH_fit, which = 1)
+plot(APARCH_fit, which = 1)
+
+GARCH_for <- ugarchforecast(GARCH_fit, n.ahead = 5)
+IGARCH_for <- ugarchforecast(IGARCH_fit, n.ahead = 5)
+APARCH_for <- ugarchforecast(APARCH_fit, n.ahead = 5)
+plot(GARCH_for, which = 1)
+plot(IGARCH_for, which = 1)
+plot(APARCH_for, which = 1)
+```
