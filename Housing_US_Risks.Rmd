@@ -33,7 +33,7 @@ MORTGAGE30US <- read_csv("Data/MORTGAGE30US.csv",
                                           MORTGAGE30US = col_number()))
 ```
 
-```{r message=FALSE, echo=FALSE, fig.dim = c(6, 3), warning=FALSE}
+```{r message=FALSE, echo=FALSE, fig.dim = c(6, 3), warning=FALSE, message=FALSE}
 library(astsa)
 library(ggplot2)
 library(ggfortify)
@@ -44,6 +44,7 @@ library(stats) # To choose a model by AIC in a Step-wise Algorithm
 library(ldsr) # To carry out a Reverse BoxCox Transformation
 library(rugarch) # GARCH Model
 library(forecast)
+library(plotly)
 
 options(scipen = 999)
 
@@ -51,7 +52,7 @@ mspus.ts <- ts(MSPUS$MSPUS[34:244], start = c(1971, 2), frequency = 4)
 cusr.ts <- ts(CUSR0000SA0L2$CUSR0000SA0L2[98:308], start = c(1971, 2), frequency = 4)
 
 msacsr.ts <- ts(MSACSR$MSACSR[34:244], start = c(1971, 2), frequency = 4)
-houst.ts <- ts(HOUST$HOUST[50:261], start = c(1971, 2), frequency = 4, end = c(2023, 4))
+houst.ts <- ts(HOUST$HOUST[50:261], start = c(1971, 2), frequency = 4, end = c(2023, 4))/1000 # Millions of Units
 rhorusq156n.ts <- ts(RHORUSQ156N$RHORUSQ156N[26:236], start = c(1971, 2), frequency = 4)
 mortgage.ts <- ts(MORTGAGE30US$MORTGAGE30US, start = c(1971, 2) , frequency = 4, end = c(2023, 4))
 
@@ -88,7 +89,7 @@ As provided by the Census, start occurs when excavation begins for the footings 
 ```{r message=FALSE, echo=FALSE, fig.dim = c(6, 2)}
 tsplot(houst.ts, col ="limegreen",
        main = "New Privately-Owned Housing Units Started : Total Units",
-       ylab = "Thousands of Units")
+       ylab = "Millions of Units")
 ```
 
 ## Homeownership Rate in the United States (RHORUSQ156N) [Quarterly] [Q1 '65 - Q4'23]
@@ -113,7 +114,7 @@ tsplot(mortgage.ts, col ="purple",
 ## Consumer Price Index for All Urban Consumers: All Items Less Shelter in U.S. City Average (CUSR0000SA0L2) [Monthly] [Jan'47 - Jan'24]
 **Additional Variable [NOT to be used as a predictor]**
 
-```{r, echo=FALSE, fig.dim = c(6, 2)}
+```{r message=FALSE, echo=FALSE, fig.dim = c(6, 2)}
 tsplot(cusr.ts, col ="darkorange",
        main = "Consumer Price Index (CPI)",
        ylab = "Index 1982-1984=100")
@@ -130,105 +131,7 @@ iv) 30-Year Fixed Rate Mortgage Average in the United States
 
 We will try to answer which (if any) of the four factors have an effect on the Median Sales price of houses sold. We will also try to answer which factor has the strongest effect on median prices. Analysis A will be used to answer these questions.
 
-We will also try to gauge how volatile are prices to shocks in supply, housing starts, and Mortgage rates. Analysis C will consist of analyzing volatility patterns to better understand these factors. 
-
-## Viability Plots
-
-```{r warning=FALSE, echo=FALSE}
-# De-trending MSPUS Time Series
-mspus_trend <- lm(mspus.ts.adj ~ time(mspus.ts.adj))
-
-par(mfrow=c(2,1))
-tsplot(mspus.ts.adj, col ="darkblue",
-       main = "Median Sales Price of Houses Sold in United States [Adjusted]",
-       ylab = "USD")
-abline(mspus_trend, col = "red")
-tsplot(resid(mspus_trend), col ="darkblue",
-       main = "[De-trended] Median Sales Price of Houses Sold in United States",
-       ylab = "Residual")
-# check for Stationarity using (Augmented) Dickey-Fuller Test and KPSS Test
-adf.test(resid(mspus_trend))
-kpss.test(resid(mspus_trend))
-bptest(lm(resid(mspus_trend) ~ time(resid(mspus_trend))))
-```
-
-ADF & KPSS tests conclude stationarity.
-
-The series passes both these tests of stationarity. But the series exhibits an obvious heteroscedasticity where higher levels are associated with higher variation. A BoxCox transformation is recommended.
-
-```{r, echo=FALSE}
-optim_lambda <- BoxCox.lambda(mspus.ts.adj, method = c("guerrero", "loglik"),
-                              lower = -2, upper = 2)
-mspus.ts.boxcox <- BoxCox(mspus.ts.adj, lambda = optim_lambda) # BoxCox transformation of Adjusted Series
-mspus.box.diff <- diff(mspus.ts.boxcox) # Differencing the BoxCox transformed series
-tsplot(mspus.box.diff)
-adf.test(mspus.box.diff)
-kpss.test(mspus.box.diff)
-bptest(lm(mspus.box.diff ~ time(mspus.box.diff)))
-
-#mspus.ts.boxcox.resid <- resid(lm(mspus.ts.boxcox ~ time(mspus.ts.boxcox))) # De-trending the transformed series
-#mspus.ts.boxcox.resid <- ts(mspus.ts.boxcox.resid, start = c(1971, 2), frequency = 4) # Converting to a time series
-#tsplot(mspus.ts.boxcox.resid)
-#adf.test(mspus.ts.boxcox.resid)
-#kpss.test(mspus.ts.boxcox.resid)
-#bptest(lm(mspus.ts.boxcox.resid ~ time(mspus.ts.boxcox.resid)))
-```
-
-The differenced and BoxCox transformed series passes tests of stationarity and is homoscedastic.
-
-We can now proceed with regression.
-
-```{r}
-houst.ts1<- window(houst.ts, start = c(1971,3))
-mortgage.ts1<- window(mortgage.ts, start = c(1971,3))
-msacsr.ts1<- window(msacsr.ts, start = c(1971,3))
-rhorusq156n.ts1<- window(rhorusq156n.ts, start = c(1971,3))
-full_model <- lm(mspus.box.diff ~ time(mspus.box.diff) + houst.ts1 + mortgage.ts1 + msacsr.ts1 + rhorusq156n.ts1)
-summary(full_model)
-all_model <- step(full_model, direction = "both", trace = 1)
-```
-
-Thus we conclude that Predictor 1 (MSACSR) and Predictor 4 (MORTGAGE30US) are significant predictors of housing prices based on AIC criteria.
-
-```{r}
-chosen_model <- lm(mspus.box.diff ~ time(mspus.box.diff) + mortgage.ts1 + msacsr.ts1)
-summary(chosen_model)
-checkresiduals(chosen_model, test = "LB")
-```
-
-The Ljung-Box test concludes that the residuals are not independently distributed; they exhibit serial correlation. We will carry out Regression with autocorrelated errors.
-
-```{r}
-acf(chosen_model$residuals)
-pacf(chosen_model$residuals)
-```
-
-ACF cuts off after 1
-
-PACF cuts off after 1
-
-ARMA(1,1) looks like a good fit for the residuals.
-
-p=1
-q=1
-
-We will now fit a ARMA(1,1) model and carry out forecasting.
-```{r}
-arma11_model<- sarima(mspus.box.diff, p = 1, d = 0, q = 1)
-forecast1 <- sarima.for(mspus.box.diff, n.ahead = 5, p = 1, d = 0, q = 1)
-```
-
-The ACF of residuals show that they now resemble white noise.
-
-```{r}
-new_vals <- cumsum(c(mspus.ts.boxcox[211],forecast1$pred))
-std_err1 <- forecast1$se
-forecast1_adj <- inv_boxcox(new_vals[-1], lambda = optim_lambda)
-mspus_pred1 <- (cusr.ts[length(cusr.ts)]/100*forecast1_adj)*1000
-print(mspus_pred1)
-new_mspus <- ts(c(mspus.ts,mspus_pred1),start = c(1971, 2), frequency = 4)
-tsplot(new_mspus)
-```
+We will also try to gauge how volatile are prices to shocks in supply, housing starts, and Mortgage rates. Analysis C will consist of analyzing volatility patterns to better understand these factors.
 
 ## Plans for Analysis
 
@@ -245,6 +148,129 @@ STEP 3.5) Multiple model sizes will be analyzed to find the optimum model to be 
 
 STEP 4) Based on the p/ACF of the residuals, we may conduct regression with autocorrelated errors.
 
+## Viability Plots
+
+```{r warning=FALSE, echo=FALSE}
+# De-trending MSPUS Time Series
+mspus_trend <- lm(mspus.ts.adj ~ time(mspus.ts.adj))
+
+par(mfrow=c(2,1))
+tsplot(mspus.ts.adj, col ="darkblue",
+       main = "Median Sales Price of Houses Sold in United States [Adjusted]",
+       ylab = "USD")
+abline(mspus_trend, col = "red")
+tsplot(mspus_trend$residuals, col ="darkblue",
+       main = "[De-trended] Median Sales Price of Houses Sold in United States",
+       ylab = "Residual")
+# check for Stationarity using (Augmented) Dickey-Fuller Test and KPSS Test
+adf.test(resid(mspus_trend))
+kpss.test(resid(mspus_trend))
+bptest(lm(resid(mspus_trend) ~ time(resid(mspus_trend))))
+```
+
+ADF & KPSS tests conclude stationarity.
+
+The series passes both these tests of stationarity. But the series exhibits an obvious heteroscedasticity (evidenced by BP-Test), where higher levels are associated with higher variation. A BoxCox transformation is recommended.
+
+```{r, echo=FALSE, warning=FALSE, fig.dim = c(6, 2)}
+optim_lambda <- BoxCox.lambda(mspus.ts.adj, method = c("guerrero", "loglik"),
+                              lower = -2, upper = 2)
+mspus.ts.boxcox <- BoxCox(mspus.ts.adj, lambda = optim_lambda) # BoxCox transformation of Adjusted Series
+mspus.box.diff <- diff(mspus.ts.boxcox) # Differencing the BoxCox transformed series
+tsplot(mspus.box.diff, col ="mediumblue", main = "Differencing and BoxCox Transformation of Price", ylab = "Diff(BoxCox(MSPUS))")
+adf.test(mspus.box.diff)
+kpss.test(mspus.box.diff)
+bptest(lm(mspus.box.diff ~ time(mspus.box.diff)))
+
+#mspus.ts.boxcox.resid <- resid(lm(mspus.ts.boxcox ~ time(mspus.ts.boxcox))) # De-trending the transformed series
+#mspus.ts.boxcox.resid <- ts(mspus.ts.boxcox.resid, start = c(1971, 2), frequency = 4) # Converting to a time series
+#tsplot(mspus.ts.boxcox.resid)
+#adf.test(mspus.ts.boxcox.resid)
+#kpss.test(mspus.ts.boxcox.resid)
+#bptest(lm(mspus.ts.boxcox.resid ~ time(mspus.ts.boxcox.resid)))
+```
+
+The differenced and BoxCox transformed series passes tests of stationarity and is homoscedastic.
+
+We can now proceed with regression.
+
+We will use the step-wise algorithm to find the optimum model. 
+
+```{r echo=FALSE}
+houst.ts1<- window(houst.ts, start = c(1971,3))
+mortgage.ts1<- window(mortgage.ts, start = c(1971,3))
+msacsr.ts1<- window(msacsr.ts, start = c(1971,3))
+rhorusq156n.ts1<- window(rhorusq156n.ts, start = c(1971,3))
+time_mspus <- time(mspus.box.diff)
+
+full_model <- lm(mspus.box.diff ~ time_mspus + houst.ts1 + mortgage.ts1 + msacsr.ts1 + rhorusq156n.ts1)
+#summary(full_model)
+
+all_model <- step(full_model, direction = "both", trace = 1)
+```
+
+Thus we conclude that Predictor 1 (MSACSR) and Predictor 4 (MORTGAGE30US) are significant predictors of housing prices based on AIC criteria.
+
+We will now carry out residual analysis:
+
+```{r echo=FALSE}
+chosen_model <- lm(mspus.box.diff ~ time(mspus.box.diff) + mortgage.ts1 + msacsr.ts1)
+#summary(chosen_model)
+checkresiduals(chosen_model, test = "LB")
+```
+
+The Ljung-Box test concludes that the residuals are not independently distributed; they exhibit serial correlation. We will carry out Regression with autocorrelated errors.
+
+```{r echo=FALSE, fig.dim = c(6, 3)}
+acf(chosen_model$residuals)
+```
+
+ACF cuts off after 1.
+
+```{r echo=FALSE, fig.dim = c(6, 3)}
+pacf(chosen_model$residuals)
+```
+
+PACF cuts off after 1
+
+ARMA(1,1) looks like a good fit for the residuals. We will fit a ARMA(1,1) model and carry out forecasting.
+
+```{r echo=FALSE, results='hide', fig.dim=c(6,3)}
+arma11_model<- sarima(mspus.box.diff, p = 1, d = 0, q = 1)
+```
+
+```{r echo=FALSE, fig.dim=c(6,3)}
+forecast1 <- sarima.for(mspus.box.diff, n.ahead = 5, p = 1, d = 0, q = 1)
+```
+
+The ACF of residuals show that they now resemble white noise.
+
+```{r echo=FALSE, fig.dim=c(6,3)}
+new_vals <- cumsum(c(mspus.ts.boxcox[211],forecast1$pred))
+std_err1 <- forecast1$se
+forecast1_adj <- inv_boxcox(new_vals[-1], lambda = optim_lambda)
+mspus_pred1 <- (cusr.ts[length(cusr.ts)]/100*forecast1_adj)*1000
+new_mspus <- ts(c(mspus.ts,mspus_pred1),start = c(1971, 2), frequency = 4)
+print("Forecasted Values: ")
+tail(new_mspus, 5)
+tsplot(new_mspus, main = "Median Sales Price of Houses (Original + Predicted)",
+       ylab = "Thousands of USD", col = "mediumblue")
+```
+
+```{r}
+data_df <- data.frame(Time = time(new_mspus), Sales = as.numeric(new_mspus), Type = "Original")
+data_df$Type[(length(mspus.ts) + 1):nrow(data_df)] <- "Forecasted"
+p <- plot_ly(data_df, x = ~Time, y = ~Sales, type = 'scatter', mode = 'lines+markers',
+             color = ~Type, colors = c('mediumblue', 'red'),
+             line = list(shape = "linear"),
+             marker = list(size = 5)) %>%
+    layout(title = "Median Sales Price of Houses (Original + Predicted)",
+           xaxis = list(title = "Year"),
+           yaxis = list(title = "Thousands of USD"))
+p
+```
+
+
 ## Basic Ideas about Analysis C
 
 As can be seen from the plots of predictor variables *(i), (ii), & (iv)*, there exists "shocks" in these variables. Analysis C will focus on understanding how volatile are median prices to shocks in 'Monthly Supply of New Houses'*(supply side)*, 'New Privately Owned Housing Units Started' *(demand side)*, and '30 Year Fixed Rate Mortgage' *(Cost of Borrowing)*.
@@ -257,22 +283,31 @@ In particular, we can try to explore two ideas:
 
 The spectral analysis will require decomposing the time series into its constituent frequencies while ARCH/GARCH models will be used to model the return/growth rate of median prices.
 
-```{r}
+```{r echo=FALSE, fig.dim=c(6,3)}
 mspus.spectrum <- spectrum(mspus.ts.adj, log = "no")
-
-```
-GARCH models assume stationarity. Therefore we will use the log-differenced series for GARCH model which was shown to be stationary earlier.
-
-```{r}
-acf(mspus.box.diff)
-pacf(mspus.box.diff)
-
-sarima101 <- sarima(mspus.ts.boxcox, p = 1, d = 1, q = 1)
-summary(sarima101)
-sarima.for(mspus.ts.boxcox, p = 1, d = 1, q = 1, n.ahead = 5)
 ```
 
-```{r}
+GARCH models assume stationarity. Therefore we will use the differenced series for GARCH model which is stationary.
+
+```{r echo=FALSE, results='hide', fig.dim=c(6,3), warning=FALSE}
+adf.test(diff(mspus.ts.adj))
+kpss.test(diff(mspus.ts.adj))
+acf(diff(mspus.ts.adj))
+```
+
+```{r echo=FALSE, results='hide', fig.dim=c(6,3)}
+pacf(diff(mspus.ts.adj))
+```
+
+```{r echo=FALSE, results='hide', fig.dim=c(6,3)}
+sarima101 <- sarima(diff(mspus.ts.adj), p = 1, d = 0, q = 1)
+```
+
+```{r echo=FALSE, results='hide', fig.dim=c(6,3)}
+sarima.for(diff(mspus.ts.adj), p = 1, d = 0, q = 1, n.ahead = 5)
+```
+
+```{r echo=FALSE}
 GARCH_spec <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)),
                    mean.model = list(armaOrder = c(1,1), include.mean = TRUE)) # Standard GARCH
 IGARCH_spec <- ugarchspec(variance.model = list(model = "iGARCH", garchOrder = c(1, 1)),
