@@ -222,28 +222,31 @@ checkresiduals(chosen_model, test = "LB")
 The Ljung-Box test concludes that the residuals are not independently distributed; they exhibit serial correlation. We will carry out Regression with autocorrelated errors.
 
 ```{r echo=FALSE, fig.dim = c(6, 3)}
-acf(chosen_model$residuals)
+Acf(chosen_model$residuals)
 ```
 
 ACF cuts off after 1.
 
 ```{r echo=FALSE, fig.dim = c(6, 3)}
-pacf(chosen_model$residuals)
+Pacf(chosen_model$residuals)
 ```
 
 PACF cuts off after 1
 
 ARMA(1,1) looks like a good fit for the residuals. We will fit a ARMA(1,1) model and carry out forecasting.
 
-```{r echo=FALSE, results='hide', fig.dim=c(6,3)}
-arma11_model<- sarima(mspus.box.diff, p = 1, d = 0, q = 1)
-```
-
-```{r echo=FALSE, fig.dim=c(6,3)}
-forecast1 <- sarima.for(mspus.box.diff, n.ahead = 5, p = 1, d = 0, q = 1)
+```{r echo=FALSE, results='hide', fig.dim=c(6,6)}
+arma11_model<- sarima(mspus.box.diff, p=1, d=1, q=1, P=0, D=0, Q=0, S=4)
+#checkresiduals(arma11_model$fit)
 ```
 
 The ACF of residuals show that they now resemble white noise.
+
+We will carry out the forecasting of the stationary series using *sarima.for()* function.
+
+```{r echo=FALSE, fig.dim=c(6,3)}
+forecast1 <- sarima.for(mspus.box.diff, n.ahead = 5, p=1, d=1, q=1, P=0, D=0, Q=0, S=4)
+```
 
 ```{r echo=FALSE, fig.dim=c(6,3)}
 new_vals <- cumsum(c(mspus.ts.boxcox[211],forecast1$pred))
@@ -270,7 +273,6 @@ p <- plot_ly(data_df, x = ~Time, y = ~Sales, type = 'scatter', mode = 'lines+mar
 p
 ```
 
-
 ## Basic Ideas about Analysis C
 
 As can be seen from the plots of predictor variables *(i), (ii), & (iv)*, there exists "shocks" in these variables. Analysis C will focus on understanding how volatile are median prices to shocks in 'Monthly Supply of New Houses'*(supply side)*, 'New Privately Owned Housing Units Started' *(demand side)*, and '30 Year Fixed Rate Mortgage' *(Cost of Borrowing)*.
@@ -283,50 +285,159 @@ In particular, we can try to explore two ideas:
 
 The spectral analysis will require decomposing the time series into its constituent frequencies while ARCH/GARCH models will be used to model the return/growth rate of median prices.
 
-```{r echo=FALSE, fig.dim=c(6,3)}
-mspus.spectrum <- spectrum(mspus.ts.adj, log = "no")
+```{r echo=FALSE, results='hide', fig.dim=c(6,3), warning=FALSE}
+#mspus.spectrum <- spectrum(mspus.ts.adj, log = "no")
 ```
 
-GARCH models assume stationarity. Therefore we will use the differenced series for GARCH model which is stationary.
+GARCH models assume stationarity. Therefore we will use the log-differenced series for GARCH model which is stationary.
 
 ```{r echo=FALSE, results='hide', fig.dim=c(6,3), warning=FALSE}
-adf.test(diff(mspus.ts.adj))
-kpss.test(diff(mspus.ts.adj))
-acf(diff(mspus.ts.adj))
+#adf.test(diff(mspus.ts.adj))
+#kpss.test(diff(mspus.ts.adj))
+#Acf(diff(mspus.ts.adj))
 ```
 
 ```{r echo=FALSE, results='hide', fig.dim=c(6,3)}
-pacf(diff(mspus.ts.adj))
+#Pacf(diff(mspus.ts.adj))
+```
+
+We will need to evaluate the mean model ARMA Order and GARCH order simultaneously to fit a ARMA-GARCH model.The mean model uses ARMA that generates the forecast for the mean of the time series, while the GARCH model generates the forecast for the variance.
+
+```{r echo=FALSE, results='hide', fig.dim=c(6,3)}
+#sarima101 <- sarima(diff(mspus.ts.adj), p = 1, d = 0, q = 1)
 ```
 
 ```{r echo=FALSE, results='hide', fig.dim=c(6,3)}
-sarima101 <- sarima(diff(mspus.ts.adj), p = 1, d = 0, q = 1)
+#sarima.for(diff(mspus.ts.adj), p = 1, d = 0, q = 1, n.ahead = 5)
 ```
 
-```{r echo=FALSE, results='hide', fig.dim=c(6,3)}
-sarima.for(diff(mspus.ts.adj), p = 1, d = 0, q = 1, n.ahead = 5)
+The mean model will use an ARMA(1,1) and we will use different GARCH orders to find the best log-likelihood value to evaluate goodness of fit.
+
+```{r echo=FALSE, results='hide'}
+mspus_returns <- diff(mspus.box.diff) / lag(mspus.box.diff, k = -1)
+tsplot(mspus_returns, main = "MSPUS Return vs Time", ylab = "Return")
+adf.test(mspus_returns)
+kpss.test(mspus_returns)
 ```
 
-```{r echo=FALSE}
-GARCH_spec <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)),
-                   mean.model = list(armaOrder = c(1,1), include.mean = TRUE)) # Standard GARCH
-IGARCH_spec <- ugarchspec(variance.model = list(model = "iGARCH", garchOrder = c(1, 1)),
-                   mean.model = list(armaOrder = c(1,1), include.mean = TRUE)) # Integrated GARCH
-APARCH_spec <- ugarchspec(variance.model = list(model = "apARCH", garchOrder = c(1, 1)),
-                   mean.model = list(armaOrder = c(1,1), include.mean = TRUE)) # Asymmetric Power ARCH
-GARCH_fit <- ugarchfit(spec = GARCH_spec, data = mspus.box.diff)
-IGARCH_fit <- ugarchfit(spec = IGARCH_spec, data = mspus.box.diff)
-APARCH_fit <- ugarchfit(spec = APARCH_spec, data = mspus.box.diff)
 
+```{r echo=FALSE, results='hide'}
+# Standard GARCH
+GARCH_spec <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(2, 1)),
+                   mean.model = list(armaOrder = c(1,1), include.mean = TRUE)) 
+GARCH_fit <- ugarchfit(spec = GARCH_spec, data = mspus_returns)
+GARCH_for <- ugarchforecast(GARCH_fit, n.ahead = 5)
 
 plot(GARCH_fit, which = 1)
-plot(IGARCH_fit, which = 1)
-plot(APARCH_fit, which = 1)
-
-GARCH_for <- ugarchforecast(GARCH_fit, n.ahead = 5)
-IGARCH_for <- ugarchforecast(IGARCH_fit, n.ahead = 5)
-APARCH_for <- ugarchforecast(APARCH_fit, n.ahead = 5)
 plot(GARCH_for, which = 1)
-plot(IGARCH_for, which = 1)
-plot(APARCH_for, which = 1)
+Acf(GARCH_fit@fit$residuals)
+Pacf(GARCH_fit@fit$residuals)
 ```
+
+
+```{r}
+# Reverse calculating values and plotting them
+X <- mspus.box.diff[210]
+
+for (i in 1:length(GARCH_for@forecast$seriesFor)) {
+  diff <- 0
+  diff <- X[i] * GARCH_for@forecast$seriesFor[i]
+  X[i+1] <- X[i] + diff
+}
+
+GARCHmspus.box.diff <- ts(c(mspus.box.diff,X),start = c(1971, 3), frequency = 4)
+cumsum(c(mspus.ts.boxcox[211],X[-1]))
+garch_new_vals <- cumsum(c(mspus.ts.boxcox[211],X[-1]))
+garch_forecast1_adj <- inv_boxcox(garch_new_vals[-1], lambda = optim_lambda)
+garch_mspus_pred1 <- (cusr.ts[length(cusr.ts)]/100*garch_forecast1_adj)*1000
+garch_new_mspus <- ts(c(mspus.ts,garch_mspus_pred1),start = c(1971, 2), frequency = 4)
+tsplot(garch_new_mspus, main = "Median Sales Price of Houses (Original + Predicted)",
+       ylab = "Thousands of USD", col = "mediumblue")
+print("Forecasted Values: ")
+tail(garch_new_mspus, 5)
+```
+
+```{r echo=FALSE, results='hide'}
+# Asymmetric Power ARCH
+APARCH_spec <- ugarchspec(variance.model = list(model = "apARCH", garchOrder = c(2,2)),
+                   mean.model = list(armaOrder = c(1,1), include.mean = TRUE)) 
+APARCH_fit <- ugarchfit(spec = APARCH_spec, data = mspus_returns)
+APARCH_for <- ugarchforecast(APARCH_fit, n.ahead = 5)
+
+plot(APARCH_fit, which = 1)
+plot(APARCH_for, which = 1)
+Acf(APARCH_fit@fit$residuals)
+Pacf(APARCH_fit@fit$residuals)
+```
+
+```{r}
+# Reverse calculating values and plotting them
+X <- mspus.box.diff[210]
+
+for (i in 1:length(APARCH_for@forecast$seriesFor)) {
+  diff <- 0
+  diff <- X[i] * APARCH_for@forecast$seriesFor[i]
+  X[i+1] <- X[i] + diff
+}
+
+APARCHmspus.box.diff <- ts(c(mspus.box.diff,X),start = c(1971, 3), frequency = 4)
+cumsum(c(mspus.ts.boxcox[211],X[-1]))
+aparch_new_vals <- cumsum(c(mspus.ts.boxcox[211],X[-1]))
+aparch_forecast1_adj <- inv_boxcox(aparch_new_vals[-1], lambda = optim_lambda)
+aparch_mspus_pred1 <- (cusr.ts[length(cusr.ts)]/100*aparch_forecast1_adj)*1000
+aparch_new_mspus <- ts(c(mspus.ts,aparch_mspus_pred1),start = c(1971, 2), frequency = 4)
+tsplot(aparch_new_mspus, main = "Median Sales Price of Houses (Original + Predicted)",
+       ylab = "Thousands of USD", col = "mediumblue")
+print("Forecasted Values: ")
+tail(aparch_new_mspus, 5)
+```
+
+```{r}
+IGARCH_spec <- ugarchspec(variance.model = list(model = "iGARCH", garchOrder = c(0,1)),
+                   mean.model = list(armaOrder = c(1,1), include.mean = TRUE)) # Integrated GARCH
+IGARCH_fit <- ugarchfit(spec = IGARCH_spec, data = mspus_returns)
+IGARCH_for <- ugarchforecast(IGARCH_fit, n.ahead = 5)
+
+plot(IGARCH_fit, which = 1)
+plot(IGARCH_for, which = 1)
+Acf(IGARCH_fit@fit$residuals)
+Pacf(IGARCH_fit@fit$residuals)
+```
+
+```{r}
+# Reverse calculating values and plotting them
+X <- mspus.box.diff[210]
+
+for (i in 1:length(IGARCH_for@forecast$seriesFor)) {
+  diff <- 0
+  diff <- X[i] * IGARCH_for@forecast$seriesFor[i]
+  X[i+1] <- X[i] + diff
+}
+
+IGARCHmspus.box.diff <- ts(c(mspus.box.diff,X),start = c(1971, 3), frequency = 4)
+cumsum(c(mspus.ts.boxcox[211],X[-1]))
+igarch_new_vals <- cumsum(c(mspus.ts.boxcox[211],X[-1]))
+igarch_forecast1_adj <- inv_boxcox(igarch_new_vals[-1], lambda = optim_lambda)
+igarch_mspus_pred1 <- (cusr.ts[length(cusr.ts)]/100*igarch_forecast1_adj)*1000
+igarch_new_mspus <- ts(c(mspus.ts,igarch_mspus_pred1),start = c(1971, 2), frequency = 4)
+tsplot(igarch_new_mspus, main = "Median Sales Price of Houses (Original + Predicted)",
+       ylab = "Thousands of USD", col = "mediumblue")
+print("Forecasted Values: ")
+tail(igarch_new_mspus, 5)
+```
+
+
+```{r}
+t <- 1:30
+plot(t, tail(new_mspus,30), type = "l", col = "red", xlab = "Time", ylab = "Value",
+     main = "Prediction Plot of All Models")
+
+lines(t, tail(garch_new_mspus,30), col = "blue")
+lines(t, tail(aparch_new_mspus,30), col = "green")
+lines(t, tail(igarch_new_mspus,30), col = "purple")
+
+legend("topleft", legend = c("Regression", "GARCH", "APARCH", "IGARCH"),
+       col = c("red", "blue", "green", "purple"), lty = 1, cex = 0.8)
+```
+
+
