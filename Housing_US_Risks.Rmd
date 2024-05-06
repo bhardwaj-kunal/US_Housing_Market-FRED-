@@ -45,6 +45,7 @@ library(ldsr) # To carry out a Reverse BoxCox Transformation
 library(rugarch) # GARCH Model
 library(forecast)
 library(plotly)
+library(aTSA) # ARCH Test
 
 options(scipen = 999)
 
@@ -75,10 +76,12 @@ Moreover, adjusting median housing prices for inflation should lead to more accu
 
 The months' supply is the ratio of new houses for sale to new houses sold. This statistic provides an indication of the size of the new for-sale inventory in relation to the number of new houses currently being sold. The months' supply indicates how long the current new for-sale inventory would last given the current sales rate if no additional new houses were built.
 
-```{r message=FALSE, echo=FALSE, fig.dim = c(6, 2)}
+```{r echo=FALSE, fig.dim=c(6,3), message=FALSE}
+png('msacsr.ts.png', width = 1200, height = 600)
 tsplot(msacsr.ts, col ="mediumblue",
        main = "Monthly Supply of New Houses in the United States",
        ylab = "Month's Supply")
+dev.off ();
 ```
 
 ## New Privately-Owned Housing Units Started: Total Units (HOUST) [Monthly] [Jan'59 - Jan'24]
@@ -283,11 +286,13 @@ In particular, we can try to explore two ideas:
 
 2) **Asymmetry in Volatility:** Are there asymmetries in the response of housing prices to shocks? APARCH models are particularly useful for capturing asymmetries in volatility, allowing for a more nuanced understanding of how positive and negative shocks impact housing market dynamics differently.
 
-The spectral analysis will require decomposing the time series into its constituent frequencies while ARCH/GARCH models will be used to model the return/growth rate of median prices.
-
 ```{r echo=FALSE, results='hide', fig.dim=c(6,3), warning=FALSE}
 #mspus.spectrum <- spectrum(mspus.ts.adj, log = "no")
+tsplot(arma11_model$fit$residuals^2, col = "red", main = "ARIMA(1,1,1) model residuals Squared", ylab = "Residual^2")
 ```
+The plot of residuals squared from the ARIMA fit shows the residuals have conditional heteroscedasticity. An ARCH/GARCH model should be a good candidate.
+
+The spectral analysis will require decomposing the time series into its constituent frequencies while ARCH/GARCH models will be used to model the return/growth rate of median prices.
 
 GARCH models assume stationarity. Therefore we will use the log-differenced series for GARCH model which is stationary.
 
@@ -311,7 +316,7 @@ We will need to evaluate the mean model ARMA Order and GARCH order simultaneousl
 #sarima.for(diff(mspus.ts.adj), p = 1, d = 0, q = 1, n.ahead = 5)
 ```
 
-The mean model will use an ARMA(1,1) and we will use different GARCH orders to find the best log-likelihood value to evaluate goodness of fit.
+The mean model will use an ARMA(1,1) and we will use different GARCH orders to find the best ICs to evaluate goodness of fit.
 
 ```{r echo=FALSE, results='hide'}
 mspus_returns <- diff(mspus.box.diff) / lag(mspus.box.diff, k = -1)
@@ -329,6 +334,7 @@ GARCH_fit <- ugarchfit(spec = GARCH_spec, data = mspus_returns)
 GARCH_for <- ugarchforecast(GARCH_fit, n.ahead = 5)
 
 plot(GARCH_fit, which = 1)
+plot(GARCH_fit, which = 3)
 plot(GARCH_for, which = 1)
 Acf(GARCH_fit@fit$residuals)
 Pacf(GARCH_fit@fit$residuals)
@@ -359,12 +365,13 @@ tail(garch_new_mspus, 5)
 
 ```{r echo=FALSE, results='hide'}
 # Asymmetric Power ARCH
-APARCH_spec <- ugarchspec(variance.model = list(model = "apARCH", garchOrder = c(2,2)),
+APARCH_spec <- ugarchspec(variance.model = list(model = "apARCH", garchOrder = c(2,0)),
                    mean.model = list(armaOrder = c(1,1), include.mean = TRUE)) 
 APARCH_fit <- ugarchfit(spec = APARCH_spec, data = mspus_returns)
 APARCH_for <- ugarchforecast(APARCH_fit, n.ahead = 5)
 
 plot(APARCH_fit, which = 1)
+plot(APARCH_fit, which = 3)
 plot(APARCH_for, which = 1)
 Acf(APARCH_fit@fit$residuals)
 Pacf(APARCH_fit@fit$residuals)
@@ -394,11 +401,12 @@ tail(aparch_new_mspus, 5)
 
 ```{r}
 IGARCH_spec <- ugarchspec(variance.model = list(model = "iGARCH", garchOrder = c(0,1)),
-                   mean.model = list(armaOrder = c(1,1), include.mean = TRUE)) # Integrated GARCH
+                   mean.model = list(armaOrder = c(2,2), include.mean = TRUE)) # Integrated GARCH
 IGARCH_fit <- ugarchfit(spec = IGARCH_spec, data = mspus_returns)
 IGARCH_for <- ugarchforecast(IGARCH_fit, n.ahead = 5)
 
 plot(IGARCH_fit, which = 1)
+plot(IGARCH_fit, which = 3)
 plot(IGARCH_for, which = 1)
 Acf(IGARCH_fit@fit$residuals)
 Pacf(IGARCH_fit@fit$residuals)
@@ -439,5 +447,3 @@ lines(t, tail(igarch_new_mspus,30), col = "purple")
 legend("topleft", legend = c("Regression", "GARCH", "APARCH", "IGARCH"),
        col = c("red", "blue", "green", "purple"), lty = 1, cex = 0.8)
 ```
-
-
