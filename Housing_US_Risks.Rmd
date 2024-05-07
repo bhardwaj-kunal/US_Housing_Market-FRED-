@@ -7,6 +7,7 @@ output:
 ---
 
 # Understanding Housing Market Trends and Risks :
+
 # An Analytical Study
 
 ```{r message=FALSE, warning=FALSE, echo=FALSE, warning=FALSE}
@@ -72,6 +73,7 @@ From the plot of Median Sales Price of Houses Sold, we can see that there exists
 Moreover, adjusting median housing prices for inflation should lead to more accurate forecasts by avoid biases introduced by price shocks in commodity prices, the effect of which have not been included in the model.
 
 ## Monthly Supply of New Houses in the United States (MSACSR) [Monthly] [Jan'63 - Dec'23]
+
 **Predictor variable 1**
 
 The months' supply is the ratio of new houses for sale to new houses sold. This statistic provides an indication of the size of the new for-sale inventory in relation to the number of new houses currently being sold. The months' supply indicates how long the current new for-sale inventory would last given the current sales rate if no additional new houses were built.
@@ -85,6 +87,7 @@ dev.off ();
 ```
 
 ## New Privately-Owned Housing Units Started: Total Units (HOUST) [Monthly] [Jan'59 - Jan'24]
+
 **Predictor variable 2**
 
 As provided by the Census, start occurs when excavation begins for the footings or foundation of a building. Increases in housing starts and permits indicate growing supply, which can help alleviate housing shortages and moderate price growth. Conversely, declines in construction activity may contribute to supply constraints and upward pressure on prices.
@@ -96,6 +99,7 @@ tsplot(houst.ts, col ="limegreen",
 ```
 
 ## Homeownership Rate in the United States (RHORUSQ156N) [Quarterly] [Q1 '65 - Q4'23]
+
 **Predictor variable 3**
 
 The homeownership rate is the proportion of households that is owner-occupied.
@@ -107,6 +111,7 @@ tsplot(rhorusq156n.ts, col ="red",
 ```
 
 ## 30-Year Fixed Rate Mortgage Average in the United States (MORTGAGE30US) [Weekly] [Apr'71 - Feb'24]
+
 **Predictor variable 4**
 
 ```{r message=FALSE, echo=FALSE, fig.dim = c(6, 2)}
@@ -115,6 +120,7 @@ tsplot(mortgage.ts, col ="purple",
 ```
 
 ## Consumer Price Index for All Urban Consumers: All Items Less Shelter in U.S. City Average (CUSR0000SA0L2) [Monthly] [Jan'47 - Jan'24]
+
 **Additional Variable [NOT to be used as a predictor]**
 
 ```{r message=FALSE, echo=FALSE, fig.dim = c(6, 2)}
@@ -127,7 +133,7 @@ tsplot(cusr.ts, col ="darkorange",
 
 The primary objective is to predict the Median Sales price of houses sold in the United States based on four factors:
 
-i) Monthly supply of New Houses in the United States
+i)  Monthly supply of New Houses in the United States
 ii) New Privately-owned Housing units started
 iii) Home ownership rate in the United States
 iv) 30-Year Fixed Rate Mortgage Average in the United States
@@ -138,8 +144,7 @@ We will also try to gauge how volatile are prices to shocks in supply, housing s
 
 ## Plans for Analysis
 
-**ANALYSIS A **
-The time series data of median price [MSPUS] will be regressed on time *(t)* and the four other independent variables.
+**ANALYSIS A** The time series data of median price [MSPUS] will be regressed on time *(t)* and the four other independent variables.
 
 STEP 1) The Median Prices (outcome variable) will be pre processed by adjusting for inflation, followed by de-trending and log transformation to make it stationary and homoscedastic.
 
@@ -197,7 +202,7 @@ The differenced and BoxCox transformed series passes tests of stationarity and i
 
 We can now proceed with regression.
 
-We will use the step-wise algorithm to find the optimum model. 
+We will use the step-wise algorithm to find the optimum model.
 
 ```{r echo=FALSE}
 houst.ts1<- window(houst.ts, start = c(1971,3))
@@ -263,33 +268,21 @@ tsplot(new_mspus, main = "Median Sales Price of Houses (Original + Predicted)",
        ylab = "Thousands of USD", col = "mediumblue")
 ```
 
-```{r}
-data_df <- data.frame(Time = time(new_mspus), Sales = as.numeric(new_mspus), Type = "Original")
-data_df$Type[(length(mspus.ts) + 1):nrow(data_df)] <- "Forecasted"
-p <- plot_ly(data_df, x = ~Time, y = ~Sales, type = 'scatter', mode = 'lines+markers',
-             color = ~Type, colors = c('mediumblue', 'red'),
-             line = list(shape = "linear"),
-             marker = list(size = 5)) %>%
-    layout(title = "Median Sales Price of Houses (Original + Predicted)",
-           xaxis = list(title = "Year"),
-           yaxis = list(title = "Thousands of USD"))
-p
-```
-
 ## Basic Ideas about Analysis C
 
 As can be seen from the plots of predictor variables *(i), (ii), & (iv)*, there exists "shocks" in these variables. Analysis C will focus on understanding how volatile are median prices to shocks in 'Monthly Supply of New Houses'*(supply side)*, 'New Privately Owned Housing Units Started' *(demand side)*, and '30 Year Fixed Rate Mortgage' *(Cost of Borrowing)*.
 
-In particular, we can try to explore two ideas: 
+In particular, we can try to explore two ideas:
 
-1) **Volatility Patterns:** How does volatility in housing prices and related variables behave over different frequencies? Spectral analysis can reveal cyclical patterns in volatility, while GARCH, APARCH, and IGARCH models can help identify and model the conditional heteroskedasticity in the data.
+1)  **Volatility Patterns:** How does volatility in housing prices and related variables behave over different frequencies? Spectral analysis can reveal cyclical patterns in volatility, while GARCH, APARCH, and IGARCH models can help identify and model the conditional heteroskedasticity in the data.
 
-2) **Asymmetry in Volatility:** Are there asymmetries in the response of housing prices to shocks? APARCH models are particularly useful for capturing asymmetries in volatility, allowing for a more nuanced understanding of how positive and negative shocks impact housing market dynamics differently.
+2)  **Asymmetry in Volatility:** Are there asymmetries in the response of housing prices to shocks? APARCH models are particularly useful for capturing asymmetries in volatility, allowing for a more nuanced understanding of how positive and negative shocks impact housing market dynamics differently.
 
 ```{r echo=FALSE, results='hide', fig.dim=c(6,3), warning=FALSE}
 #mspus.spectrum <- spectrum(mspus.ts.adj, log = "no")
 tsplot(arma11_model$fit$residuals^2, col = "red", main = "ARIMA(1,1,1) model residuals Squared", ylab = "Residual^2")
 ```
+
 The plot of residuals squared from the ARIMA fit shows the residuals have conditional heteroscedasticity. An ARCH/GARCH model should be a good candidate.
 
 The spectral analysis will require decomposing the time series into its constituent frequencies while ARCH/GARCH models will be used to model the return/growth rate of median prices.
@@ -325,7 +318,6 @@ adf.test(mspus_returns)
 kpss.test(mspus_returns)
 ```
 
-
 ```{r echo=FALSE, results='hide'}
 # Standard GARCH
 GARCH_spec <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(2, 1)),
@@ -339,7 +331,6 @@ plot(GARCH_for, which = 1)
 Acf(GARCH_fit@fit$residuals)
 Pacf(GARCH_fit@fit$residuals)
 ```
-
 
 ```{r}
 # Reverse calculating values and plotting them
@@ -434,7 +425,6 @@ print("Forecasted Values: ")
 tail(igarch_new_mspus, 5)
 ```
 
-
 ```{r}
 t <- 1:75
 plot(t, tail(new_mspus,75), type = "l", col = "red", xlab = "Time", ylab = "Median Price (USD)",
@@ -447,4 +437,3 @@ lines(t, tail(igarch_new_mspus,75), col = "purple")
 legend("topleft", legend = c("Regression", "GARCH", "APARCH", "IGARCH"),
        col = c("red", "blue", "green", "purple"), lty = 1, cex = 0.8)
 ```
-

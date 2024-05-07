@@ -1,0 +1,395 @@
+---
+title             : "Understanding Housing Market Trends and Risks : An Analytical Study"
+shorttitle        : "Housing Market Trends and Risks"
+
+author: 
+  - name          : "Kunal Bhardwaj"
+    affiliation   : "1"
+    email         : "kunal5@illinois.edu"
+    role: # Contributorship roles (e.g., CRediT, https://credit.niso.org/)
+      - "Conceptualization"
+      - "Data Curation"
+      - "Visualization"
+      - "Writing - Original Draft Preparation"
+      - "Writing - Review & Editing"
+
+affiliation:
+  - id            : "1"
+    institution   : "UIUC"
+
+
+authornote: |
+  STAT 429: Time Series Analysis
+
+abstract: |
+  The objective of this study is to arrive at a model to predict the median sales price of houses sold in the US. The study tries to find the most significant predictors of price based on a regression analysis. A further ARCH-based analysis will try to estimate the volatility in house prices.
+  The study finds that 'Median Sales Price of Houses Sold' and '30 Year Fixed Rate Mortgage Average' are significant predictors of housing prices. The forecasting performance for ARIMA and ARCH models were found to be fairly similar.
+
+  The study found that homeownership rate is not a significant predictor of median housing prices. It was also found that ARCH models failed to capture volatility patterns with a high degree of satisfaction. This may be due to the fact that the US housing market has been historically been very stable and immune to price shocks in the past.
+  The results from all the selected models reveal that median house prices will remain stable or will go down slightly over the next five quarters.
+  
+  <!-- https://tinyurl.com/ybremelq -->
+
+
+bibliography      : "r-references.bib"
+
+floatsintext      : no
+linenumbers       : yes
+draft             : no
+mask              : no
+
+figurelist        : no
+tablelist         : no
+footnotelist      : no
+
+classoption       : "man"
+output            : papaja::apa6_pdf
+---
+
+```{r setup, include = FALSE}
+library("papaja")
+r_refs("r-references.bib")
+library("astsa")
+```
+
+```{r analysis-preferences}
+# Seed for random number generation
+set.seed(42)
+knitr::opts_chunk$set(cache.extra = knitr::rand_seed,fig.height = 3)
+```
+
+# Introduction
+
+*Federal Reserve Economic Data (FRED)* is a comprehensive database maintained by the Federal Reserve Bank of St. Louis. It provides access to a wide range of economic data, including economic indicators, financial and banking data, monetary data, and regional data for the United States. FRED aggregates data from various government agencies, international organizations, and other sources, making it a valuable resource for researchers, economists, policymakers, and the general public.
+
+The dataset retrieved from *FRED* website comprises of six time series:
+
+i) Median Sales Price of Houses Sold for the United States
+
+ii) Monthly supply of New Houses in the United States
+
+iii) New Privately owned Housing units started
+
+iv) Home ownership rate in the United States
+
+v) 30 Year Fixed Rate Mortgage Average in the United States
+
+vi) Consumer Price Index (CPI) for All Urban Consumers: All Items Less Shelter in U.S. City Average
+
+The objective of the project will be to predict Median Price *(i)* based on four other factors *(ii), (iii), (iv) & (v)*. The CPI data *(vi)* will not be used as a predictor but will be used to adjust Median Price based on inflation.
+
+These four variables are fundamental drivers influencing the supply and demand dynamics of the housing market. For instance, the monthly supply of new houses and new housing units started *(ii)* offer insights into the supply side of the market, while the home ownership rate *(iv)* reflects the demand for housing. Moreover, the 30 year fixed rate mortgage average *(v)* directly impacts affordability and purchasing power, crucial factors influencing housing demand. The structure of the data is outlined below.
+
+## Median Sales Price of Houses Sold for the United States (MSPUS) [Quarterly] [Q1'63   Q4'23] *OUTCOME VARIABLE*
+The Median Sales Price of Houses Sold for the United States in US Dollars. The original data has not been seasonally adjusted.
+```{r message=FALSE, warning=FALSE, echo=FALSE, warning=FALSE}
+library(readr)
+MSPUS <- read_csv("Data/MSPUS.csv",
+                  col_types = cols(DATE = col_date(format = "%Y-%m-%d")))
+
+CUSR0000SA0L2 <- read_csv("Data/CUSR0000SA0L2.csv",
+                          col_types = cols(DATE = col_date(format = "%Y-%m-%d"),
+                                           CUSR0000SA0L2 = col_double()))
+
+MSACSR <- read_csv("Data/MSACSR.csv",
+                   col_types = cols(DATE = col_date(format = "%Y-%m-%d")))
+
+HOUST <- read_csv("Data/HOUST.csv",
+                  col_types = cols(DATE = col_date(format = "%Y-%m-%d"),
+                                   HOUST = col_number()))
+
+RHORUSQ156N <- read_csv("Data/RHORUSQ156N.csv", 
+    col_types = cols(DATE = col_date(format = "%Y-%m-%d")))
+
+MORTGAGE30US <- read_csv("Data/MORTGAGE30US.csv",
+                         col_types = cols(DATE = col_date(format = "%Y-%m-%d"),
+                                          MORTGAGE30US = col_number()))
+```
+```{r message=FALSE, echo=FALSE, fig.dim = c(6, 3), warning=FALSE, message=FALSE}
+library(astsa)
+library(ggplot2)
+library(ggfortify)
+library(fpp2) # Residual Analysis
+library(tseries) # To carry out ADF & KPSS Tests
+library(lmtest) # To carry out BP-Test
+library(stats) # To choose a model by AIC in a Step-wise Algorithm
+library(ldsr) # To carry out a Reverse BoxCox Transformation
+library(rugarch) # GARCH Model
+library(forecast)
+library(plotly)
+library(aTSA) # ARCH Test
+library(magick) # Crop PNG
+
+options(scipen = 999)
+
+mspus.ts <- ts(MSPUS$MSPUS[34:244], start = c(1971, 2), frequency = 4)
+cusr.ts <- ts(CUSR0000SA0L2$CUSR0000SA0L2[98:308], start = c(1971, 2), frequency = 4)
+
+msacsr.ts <- ts(MSACSR$MSACSR[34:244], start = c(1971, 2), frequency = 4)
+houst.ts <- ts(HOUST$HOUST[50:261], start = c(1971, 2), frequency = 4, end = c(2023, 4))/1000 # Millions of Units
+rhorusq156n.ts <- ts(RHORUSQ156N$RHORUSQ156N[26:236], start = c(1971, 2), frequency = 4)
+mortgage.ts <- ts(MORTGAGE30US$MORTGAGE30US, start = c(1971, 2) , frequency = 4, end = c(2023, 4))
+
+
+tsplot(mspus.ts/1000, col ="darkorange",
+       main = "Median Sales Price of Houses Sold for the United States",
+       ylab = "Thousands of USD")
+
+mspus.ts.adj <- (mspus.ts/1000)/cusr.ts*100
+lines(mspus.ts.adj, col = "mediumblue")
+legend("topleft", legend = c("Real Prices", "Adjusted for Inflation (CPI)"), col = c("darkorange", "mediumblue"), lty = 1)
+```
+From the plot of Median Sales Price of Houses Sold, we can see that there exists an obvious trend in the data. The Median Prices will be adjusted for inflation based on 1982:1984 prices to make median housing prices from different years directly comparable. This is crucial for understanding long term trends in housing prices and assessing changes in affordability over time.
+
+Moreover, adjusting median housing prices for inflation should lead to more accurate forecasts by avoid biases introduced by price shocks in commodity prices, the effect of which have not been included in the model.
+
+## Monthly Supply of New Houses in the United States (MSACSR) [Monthly] [Jan'63 - Dec'23] *Predictor variable 1*
+
+The months' supply is the ratio of new houses for sale to new houses sold. This statistic provides an indication of the size of the new for-sale inventory in relation to the number of new houses currently being sold. The months' supply indicates how long the current new for-sale inventory would last given the current sales rate if no additional new houses were built.
+```{r echo=FALSE, fig.dim=c(6,3), message=FALSE}
+tsplot(msacsr.ts, col ="mediumblue",
+       main = "Monthly Supply of New Houses in the United States",
+       ylab = "Month's Supply")
+```
+
+## New Privately-Owned Housing Units Started: Total Units (HOUST) [Monthly] [Jan'59 - Jan'24] *Predictor variable 2*
+
+As provided by the Census, start occurs when excavation begins for the footings or foundation of a building. Increases in housing starts and permits indicate growing supply, which can help alleviate housing shortages and moderate price growth. Conversely, declines in construction activity may contribute to supply constraints and upward pressure on prices.
+
+```{r message=FALSE, echo=FALSE, fig.dim = c(6, 2)}
+tsplot(houst.ts, col ="limegreen",
+       main = "New Privately-Owned Housing Units Started : Total Units",
+       ylab = "Millions of Units")
+```
+
+## Homeownership Rate in the United States (RHORUSQ156N) [Quarterly] [Q1 '65 - Q4'23] *Predictor variable 3*
+
+The homeownership rate is the proportion of households that is owner-occupied.
+```{r message=FALSE, echo=FALSE, fig.dim = c(6, 2)}
+tsplot(rhorusq156n.ts, col ="red",
+       main = "Homeownership Rate in the United States",
+       ylab = "Percent")
+```
+
+## 30-Year Fixed Rate Mortgage Average in the United States (MORTGAGE30US) [Weekly] [Apr'71 - Feb'24] *Predictor variable 4*
+```{r message=FALSE, echo=FALSE, fig.dim = c(6, 2)}
+tsplot(mortgage.ts, col ="purple",
+       main = "30-Year Fixed Rate Mortgage Average in the United States", ylab = "Percent")
+```
+
+## Consumer Price Index for All Urban Consumers: All Items Less Shelter in U.S. City Average (CUSR0000SA0L2) [Monthly] [Jan'47 - Jan'24] *Additional Variable [NOT to be used as a predictor]*
+```{r message=FALSE, echo=FALSE, fig.dim = c(6, 2)}
+tsplot(cusr.ts, col ="darkorange",
+       main = "Consumer Price Index (CPI)",
+       ylab = "Index: 1982-1984=100")
+```
+
+## Plans for Analysis A
+The time series data of median price [MSPUS] will be regressed on time *(t)* and the four other independent variables. The Median Prices (outcome variable) will be pre processed by adjusting for inflation, followed by de-trending and log transformation to make it stationary and homoscedastic. The four predictor variables will be converted into quarterly series if they are not already. The Median Price will be regressed on time and other predictors to arrive at the full model. Multiple model sizes will be analyzed to find the optimum model to be selected, based on AIC/BIC criteria. Based on the p/ACF of the residuals, we may conduct regression with autocorrelated errors.
+
+# Methods
+```{r warning=FALSE, echo=FALSE, results='hide',fig.dim = c(6, 4),}
+# De-trending MSPUS Time Series
+mspus_trend <- lm(mspus.ts.adj ~ time(mspus.ts.adj))
+
+par(mfrow=c(2,1))
+tsplot(mspus.ts.adj, col ="darkblue",
+       main = "Median Sales Price of Houses Sold in United States",
+       ylab = "USD")
+abline(mspus_trend, col = "red")
+tsplot(mspus_trend$residuals, col ="darkblue",
+       main = "[De-trended] Median Sales Price of Houses Sold in US",
+       ylab = "Residual")
+# check for Stationarity using (Augmented) Dickey-Fuller Test and KPSS Test
+adf.test(resid(mspus_trend))
+kpss.test(resid(mspus_trend))
+bptest(lm(resid(mspus_trend) ~ time(resid(mspus_trend))))
+```
+Preliminary adjustments indicate that median prices can be make stationary before regression with some adjustment for the heteroscastic behavior present in the series. 
+
+ADF & KPSS tests conclude stationarity. But the series exhibits an obvious heteroscedasticity (evidenced by BP-Test), where higher levels are associated with higher variation. A BoxCox transformation is recommended.
+```{r, echo=FALSE, warning=FALSE, fig.dim = c(6, 2), results='hide'}
+optim_lambda <- BoxCox.lambda(mspus.ts.adj, method = c("guerrero", "loglik"),
+                              lower = -2, upper = 2)
+mspus.ts.boxcox <- BoxCox(mspus.ts.adj, lambda = optim_lambda)
+mspus.box.diff <- diff(mspus.ts.boxcox)
+tsplot(mspus.box.diff, col ="mediumblue", main = "Differencing and BoxCox Transformation of Price", ylab = "Transformed value")
+adf.test(mspus.box.diff)
+kpss.test(mspus.box.diff)
+bptest(lm(mspus.box.diff ~ time(mspus.box.diff)))
+```
+
+The differenced and BoxCox transformed series passes tests of stationarity and is homoscedastic. We can now proceed with regression. We will use the step-wise algorithm to find the optimum model.
+```{r echo=FALSE, results='hide'}
+houst.ts1<- window(houst.ts, start = c(1971,3))
+mortgage.ts1<- window(mortgage.ts, start = c(1971,3))
+msacsr.ts1<- window(msacsr.ts, start = c(1971,3))
+rhorusq156n.ts1<- window(rhorusq156n.ts, start = c(1971,3))
+time_mspus <- time(mspus.box.diff)
+full_model <- lm(mspus.box.diff ~ time_mspus + houst.ts1 + mortgage.ts1 + msacsr.ts1 + rhorusq156n.ts1)
+all_model <- step(full_model, direction = "both", trace = 1)
+```
+The stepwise algorithm concludes that Predictor 1 (MSACSR) and Predictor 4 (MORTGAGE30US) are significant predictors of housing prices based on AIC criteria. **Refer appendix for full results of the algorithm.** We will now carry out residual analysis:
+```{r echo=FALSE, results='hide'}
+chosen_model <- lm(mspus.box.diff ~ time(mspus.box.diff) + mortgage.ts1 + msacsr.ts1)
+checkresiduals(chosen_model, test = "LB")
+```
+The Ljung-Box test concludes that the residuals are not independently distributed; they exhibit serial correlation. We will carry out Regression with autocorrelated errors.
+```{r echo=FALSE, fig.dim = c(6, 2)}
+Acf(chosen_model$residuals)
+```
+```{r echo=FALSE, fig.dim = c(6, 2)}
+Pacf(chosen_model$residuals)
+```
+
+ACF cuts off after 1. PACF cuts off after 1. ARMA(1,1) looks like a good fit for the residuals. We will fit a ARMA(1,1) model and carry out forecasting.
+```{r echo=FALSE, results='hide', fig.dim=c(6,4)}
+arma11_model<- sarima(mspus.box.diff, p=1, d=1, q=1, P=0, D=0, Q=0, S=4)
+```
+
+The ACF of residuals show that they now resemble white noise. We will carry out the forecasting of the stationary series using *sarima.for()* function.
+```{r echo=FALSE, fig.dim=c(6,3)}
+forecast1 <- sarima.for(mspus.box.diff, n.ahead = 5, p=1, d=1, q=1, P=0, D=0, Q=0, S=4)
+```
+```{r echo=FALSE, fig.dim=c(6,2)}
+new_vals <- cumsum(c(mspus.ts.boxcox[211],forecast1$pred))
+std_err1 <- forecast1$se
+forecast1_adj <- inv_boxcox(new_vals[-1], lambda = optim_lambda)
+mspus_pred1 <- (cusr.ts[length(cusr.ts)]/100*forecast1_adj)*1000
+new_mspus <- ts(c(mspus.ts,mspus_pred1),start = c(1971, 2), frequency = 4)
+print("Forecasted Values: ")
+tail(new_mspus, 5)
+tsplot(new_mspus, main = "Median Sales Price of Houses (Original + Predicted)",
+       ylab = "Thousands of USD", col = "mediumblue")
+```
+
+## Analysis C
+
+The plot of squared residuals from the ARIMA fit shows the residuals have conditional heteroscedasticity. An ARCH/GARCH model should work well to model this. We will fit three ARCH models: GARCH, IGARCH & APARCH.
+
+GARCH models assume stationarity [@tsa4]. Therefore we will use the log-differenced series for GARCH model which is stationary. We need to evaluate the mean model ARMA Order and GARCH order simultaneously to fit a ARMA-GARCH model.The mean model uses ARMA that generates the forecast for the mean of the time series, while the GARCH model generates the forecast for the variance. The mean model will use an ARMA(1,1) and we will use different GARCH orders to find the best ICs to evaluate goodness of fit.
+
+## GARCH
+```{r echo=FALSE, results='hide'}
+# Standard GARCH
+mspus_returns <- diff(mspus.box.diff) / lag(mspus.box.diff, k = -1)
+GARCH_spec <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(2, 1)),
+                   mean.model = list(armaOrder = c(1,1), include.mean = TRUE)) 
+GARCH_fit <- ugarchfit(spec = GARCH_spec, data = mspus_returns)
+GARCH_for <- ugarchforecast(GARCH_fit, n.ahead = 5)
+plot(GARCH_fit, which = 3)
+plot(GARCH_for, which = 1)
+```
+
+## APARCH
+```{r echo=FALSE, results='hide'}
+# Asymmetric Power ARCH
+APARCH_spec <- ugarchspec(variance.model = list(model = "apARCH", garchOrder = c(1,1.5)),
+                   mean.model = list(armaOrder = c(1,1), include.mean = TRUE)) 
+APARCH_fit <- ugarchfit(spec = APARCH_spec, data = mspus_returns)
+APARCH_for <- ugarchforecast(APARCH_fit, n.ahead = 5)
+plot(APARCH_fit, which = 3)
+plot(APARCH_for, which = 1)
+```
+
+## IGARCH
+```{r warning=FALSE}
+IGARCH_spec <- ugarchspec(variance.model = list(model = "iGARCH", garchOrder = c(1,1)),
+                   mean.model = list(armaOrder = c(2,2), include.mean = TRUE)) # Integrated GARCH
+IGARCH_fit <- ugarchfit(spec = IGARCH_spec, data = mspus_returns)
+IGARCH_for <- ugarchforecast(IGARCH_fit, n.ahead = 5)
+plot(IGARCH_fit, which = 3)
+plot(IGARCH_for, which = 1)
+```
+
+# Results
+```{r, results='hide'}
+# Reverse calculating values and plotting them
+X <- mspus.box.diff[210]
+
+for (i in 1:length(GARCH_for@forecast$seriesFor)) {
+  diff <- 0
+  diff <- X[i] * GARCH_for@forecast$seriesFor[i]
+  X[i+1] <- X[i] + diff
+}
+
+GARCHmspus.box.diff <- ts(c(mspus.box.diff,X),start = c(1971, 3), frequency = 4)
+cumsum(c(mspus.ts.boxcox[211],X[-1]))
+garch_new_vals <- cumsum(c(mspus.ts.boxcox[211],X[-1]))
+garch_forecast1_adj <- inv_boxcox(garch_new_vals[-1], lambda = optim_lambda)
+garch_mspus_pred1 <- (cusr.ts[length(cusr.ts)]/100*garch_forecast1_adj)*1000
+garch_new_mspus <- ts(c(mspus.ts,garch_mspus_pred1),start = c(1971, 2), frequency = 4)
+
+# Reverse calculating values and plotting them
+X <- mspus.box.diff[210]
+
+for (i in 1:length(APARCH_for@forecast$seriesFor)) {
+  diff <- 0
+  diff <- X[i] * APARCH_for@forecast$seriesFor[i]
+  X[i+1] <- X[i] + diff
+}
+
+APARCHmspus.box.diff <- ts(c(mspus.box.diff,X),start = c(1971, 3), frequency = 4)
+cumsum(c(mspus.ts.boxcox[211],X[-1]))
+aparch_new_vals <- cumsum(c(mspus.ts.boxcox[211],X[-1]))
+aparch_forecast1_adj <- inv_boxcox(aparch_new_vals[-1], lambda = optim_lambda)
+aparch_mspus_pred1 <- (cusr.ts[length(cusr.ts)]/100*aparch_forecast1_adj)*1000
+aparch_new_mspus <- ts(c(mspus.ts,aparch_mspus_pred1),start = c(1971, 2), frequency = 4)
+
+# Reverse calculating values and plotting them
+X <- mspus.box.diff[210]
+
+for (i in 1:length(IGARCH_for@forecast$seriesFor)) {
+  diff <- 0
+  diff <- X[i] * IGARCH_for@forecast$seriesFor[i]
+  X[i+1] <- X[i] + diff
+}
+
+IGARCHmspus.box.diff <- ts(c(mspus.box.diff,X),start = c(1971, 3), frequency = 4)
+cumsum(c(mspus.ts.boxcox[211],X[-1]))
+igarch_new_vals <- cumsum(c(mspus.ts.boxcox[211],X[-1]))
+igarch_forecast1_adj <- inv_boxcox(igarch_new_vals[-1], lambda = optim_lambda)
+igarch_mspus_pred1 <- (cusr.ts[length(cusr.ts)]/100*igarch_forecast1_adj)*1000
+igarch_new_mspus <- ts(c(mspus.ts,igarch_mspus_pred1),start = c(1971, 2), frequency = 4)
+```
+```{r, fig.dim=c(6,4)}
+t <- 1:75
+plot(t, tail(new_mspus,75), type = "l", col = "red", xlab = "Time", ylab = "Median Price (USD)",
+     main = "Prediction Plot of All Models")
+
+lines(t, tail(garch_new_mspus,75), col = "blue")
+lines(t, tail(aparch_new_mspus,75), col = "green")
+lines(t, tail(igarch_new_mspus,75), col = "purple")
+
+legend("topleft", legend = c("Regression", "GARCH", "APARCH", "IGARCH"),
+       col = c("red", "blue", "green", "purple"), lty = 1, cex = 0.8)
+```
+
+We conclude that MSACSR (Median Sales Price of Houses Sold) and MORTGAGE30US (30 Year Fixed Rate Mortgage Average) are significant predictors of housing prices. ARIMA (1,1,1) shows the best performance among all models tested with autocorrelated errors.
+
+We find that all three ARCH models fail to capture volatility patterns with a high degree of satisfaction. APARCH model does not seem to model negative volatility much differently from positive volatility. This may be due to very limited negative shocks experienced by the housing market, historically.We find that GARCH, APARCH & IGARCH models predict returns differently. This results in different values of the predicted values.
+
+# Discussion
+
+GARCH reacts sharply to new information (higher alpha) but suffers from high persistence (too high beta). IGARCH also reacts sharply to new information but consistently overestimates volatility (high persistence). APARCH fails to respond to new information quickly and consistently underestimates peaks.
+
+\newpage
+
+# References
+
+::: {#refs custom-style="Bibliography"}
+:::
+
+# Appendix
+
+Step-wise Algorithm results to find the optimum regression model:
+
+```{r echo=FALSE}
+houst.ts1<- window(houst.ts, start = c(1971,3))
+mortgage.ts1<- window(mortgage.ts, start = c(1971,3))
+msacsr.ts1<- window(msacsr.ts, start = c(1971,3))
+rhorusq156n.ts1<- window(rhorusq156n.ts, start = c(1971,3))
+time_mspus <- time(mspus.box.diff)
+full_model <- lm(mspus.box.diff ~ time_mspus + houst.ts1 + mortgage.ts1 + msacsr.ts1 + rhorusq156n.ts1)
+all_model <- step(full_model, direction = "both", trace = 1)
+```
