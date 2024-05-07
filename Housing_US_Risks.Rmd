@@ -365,7 +365,7 @@ tail(garch_new_mspus, 5)
 
 ```{r echo=FALSE, results='hide'}
 # Asymmetric Power ARCH
-APARCH_spec <- ugarchspec(variance.model = list(model = "apARCH", garchOrder = c(2,0)),
+APARCH_spec <- ugarchspec(variance.model = list(model = "apARCH", garchOrder = c(1,1.5)),
                    mean.model = list(armaOrder = c(1,1), include.mean = TRUE)) 
 APARCH_fit <- ugarchfit(spec = APARCH_spec, data = mspus_returns)
 APARCH_for <- ugarchforecast(APARCH_fit, n.ahead = 5)
@@ -400,7 +400,7 @@ tail(aparch_new_mspus, 5)
 ```
 
 ```{r}
-IGARCH_spec <- ugarchspec(variance.model = list(model = "iGARCH", garchOrder = c(0,1)),
+IGARCH_spec <- ugarchspec(variance.model = list(model = "iGARCH", garchOrder = c(1,1)),
                    mean.model = list(armaOrder = c(2,2), include.mean = TRUE)) # Integrated GARCH
 IGARCH_fit <- ugarchfit(spec = IGARCH_spec, data = mspus_returns)
 IGARCH_for <- ugarchforecast(IGARCH_fit, n.ahead = 5)
@@ -436,14 +436,15 @@ tail(igarch_new_mspus, 5)
 
 
 ```{r}
-t <- 1:30
-plot(t, tail(new_mspus,30), type = "l", col = "red", xlab = "Time", ylab = "Value",
+t <- 1:75
+plot(t, tail(new_mspus,75), type = "l", col = "red", xlab = "Time", ylab = "Median Price (USD)",
      main = "Prediction Plot of All Models")
 
-lines(t, tail(garch_new_mspus,30), col = "blue")
-lines(t, tail(aparch_new_mspus,30), col = "green")
-lines(t, tail(igarch_new_mspus,30), col = "purple")
+lines(t, tail(garch_new_mspus,75), col = "blue")
+lines(t, tail(aparch_new_mspus,75), col = "green")
+lines(t, tail(igarch_new_mspus,75), col = "purple")
 
 legend("topleft", legend = c("Regression", "GARCH", "APARCH", "IGARCH"),
        col = c("red", "blue", "green", "purple"), lty = 1, cex = 0.8)
 ```
+
